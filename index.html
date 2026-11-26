@@ -125,6 +125,10 @@ td.note span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertica
 .flags{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
 .flag{font-size:10.5px;font-weight:600;border-radius:3px;padding:1px 5px;background:var(--bad-soft);color:var(--bad)}
 .flag.w{background:var(--warn-soft);color:var(--warn)}
+.flag.ok{background:var(--ok-soft);color:var(--ok)}
+.btn-ent{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:4px;padding:3px 8px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-ent:hover{filter:brightness(.97)}
+.kpi.ready .v{color:var(--ok)}
 .fill{display:flex;align-items:center;gap:6px;min-width:110px}
 .bar{flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;min-width:50px}
 .bar i{display:block;height:100%;background:var(--accent)}
@@ -167,6 +171,14 @@ td.note span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertica
 .simans p{margin:4px 0 0;font-size:13px;color:var(--brand-ink-2)}
 .simans b{color:var(--brand-ink)}
 tr.fer-next td{background:var(--warn-soft)}
+.sech{font-family:var(--f-display);font-size:16px;margin:22px 0 2px;display:flex;align-items:center;gap:8px}
+.sech::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--lime)}
+.secc{margin:0 0 10px;color:var(--fg-3);font-size:12.5px}
+.prog{display:flex;align-items:center;gap:8px;min-width:170px}
+.prog .bar{min-width:70px}
+.prog .bar i{background:var(--teal)}
+.prog span{font-size:12px;color:var(--fg-2);white-space:nowrap}
+.neg{color:var(--bad);font-weight:600} .pos{color:var(--ok);font-weight:600}
 .grp td{background:var(--surface-2);font-weight:700;color:var(--fg);font-size:12.5px}
 .grp td.n{text-align:right}
 .empty{padding:40px 16px;text-align:center;color:var(--fg-2)}
@@ -262,6 +274,7 @@ label.f input,label.f select{width:100%}
 
   <section id="v-requisicoes">
     <div class="kpis" id="kpis"></div>
+    <div id="readyBar"></div>
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar requisição, carteira, acompanhamento…" aria-label="Buscar">
       <select id="fCidade" aria-label="Cidade"><option value="">Todas as cidades</option></select>
@@ -343,15 +356,32 @@ label.f input,label.f select{width:100%}
   </section>
 
   <section id="v-entregues" hidden>
-    <div class="kpis" id="entKpis"></div>
     <div class="filters">
       <select id="eCidade" aria-label="Cidade"><option value="">Todas as cidades</option></select>
-      <label class="inline" style="font-size:13px"><input type="checkbox" id="eOpen"> Incluir requisições em andamento que já têm presentes</label>
-      <span class="count" id="countE"></span>
+      <label class="inline">Entregues nos últimos <select id="ePer" aria-label="Período das entregues"><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option><option value="0">todo o período</option></select></label>
     </div>
-    <div class="tablebox"><table id="tblE">
-      <thead><tr><th>Workday</th><th>Gerente</th><th>Carteira</th><th>Cidade</th><th class="n">Necessidade</th><th class="n">Selecionados</th><th class="n">Entregues</th><th class="n">No show / desist.</th><th>Atingimento</th><th>Início trein.</th><th>ALO</th><th>Fonte</th></tr></thead>
-      <tbody id="tbe"></tbody>
+
+    <h3 class="sech">Em treinamento agora</h3>
+    <p class="secc">Turmas que já começaram e ainda não foram para a operação. Presentes, no show e desistentes vêm da lista de presença do SharePoint.</p>
+    <div class="kpis" id="eKpiT"></div>
+    <div class="tablebox"><table>
+      <thead><tr><th>Workday</th><th>Carteira</th><th>Cidade</th><th>Treinamento</th><th class="n">Necessidade</th><th class="n">Selecionados</th><th class="n">Presentes</th><th class="n">No show</th><th class="n">Desistentes</th><th>Atingimento</th><th class="n">Saldo</th><th>Atualizado</th></tr></thead>
+      <tbody id="tbeT"></tbody>
+    </table></div>
+
+    <h3 class="sech">Começam nos próximos 14 dias</h3>
+    <p class="secc">Quanto da turma já está selecionada em relação ao total com buffer.</p>
+    <div class="tablebox"><table>
+      <thead><tr><th>Workday</th><th>Carteira</th><th>Cidade</th><th>Início</th><th>ALO</th><th class="n">Necessidade</th><th class="n">Total c/ buffer</th><th class="n">Selecionados</th><th>Cobertura</th></tr></thead>
+      <tbody id="tbeP"></tbody>
+    </table></div>
+
+    <h3 class="sech">Entregues à operação</h3>
+    <p class="secc">Turmas cujo ALO já chegou, por mês do ALO: quanto foi entregue da necessidade e quanto se perdeu com no show e desistências.</p>
+    <div class="kpis" id="eKpiE"></div>
+    <div class="tablebox"><table>
+      <thead><tr><th>Workday</th><th>Carteira</th><th>Cidade</th><th class="n">Necessidade</th><th class="n">Selecionados</th><th class="n">Entregues</th><th class="n">No show</th><th class="n">Desistentes</th><th>Atingimento</th><th>ALO</th><th>Fonte</th></tr></thead>
+      <tbody id="tbeE"></tbody>
     </table></div>
   </section>
 </main>
@@ -413,6 +443,7 @@ function derive(r){
   const c = Array.isArray(r.candidatos) ? r.candidatos : [];
   if(c.length){ sel=c.length; ns=c.filter(x=>x.s==="NO SHOW").length; pr=c.filter(x=>x.s!=="NO SHOW" && x.s!=="PENDENTE").length; }
   else if(pr==null && sel!=null) pr = sel-(ns||0);
+  const desist = c.filter(x=>x.s==="NO SHOW" && x.d).length;
   const alo = r.aloManual ? r.alo : (addWorkdays(r.inicioTreino, r.diasTreino) || r.alo || null);
   const total = nec+buf;
   const hist = Array.isArray(r.hist) ? r.hist : [];
@@ -421,12 +452,12 @@ function derive(r){
   const flags = [];
   if(OPEN.has(r.status)){
     const t = todayISO();
-    if(alo && alo < t && (pr||0) < nec) flags.push(["ALO vencido",""]);
+    if(alo && alo <= t) flags.push(["Pronta para entregar","ok"]);
     if(r.inicioTreino && r.inicioTreino >= t && diffDays(r.inicioTreino,t) <= 7 && (sel||0) < total) flags.push([`Treino em ${diffDays(r.inicioTreino,t)}d`,"w"]);
     if(lastDate && diffDays(t,lastDate) >= 7) flags.push(["Sem acompanhamento","w"]);
   }
   if(S.dupes.has((r.wd||"").toUpperCase())) flags.push(["WD duplicado","w"]);
-  return {...r, necessidade:nec, buffer:buf, total, selecionados:sel, noShow:ns, presente:pr, alo,
+  return {...r, necessidade:nec, buffer:buf, total, selecionados:sel, noShow:ns, presente:pr, alo, desist,
     pct: nec ? Math.min(1,(pr||0)/nec) : 0, nota: lastNote ? lastNote.t : "", lastDate, flags,
     mes: alo ? alo.slice(0,7) : "", ano: alo ? alo.slice(0,4) : "", anoIni: (r.inicioTreino||"").slice(0,4), mesTxt: alo ? MESES[+alo.slice(5,7)-1] : "", anoAb: (r.abertura||r.inicioTreino||alo||"").slice(0,4)};
 }
@@ -484,7 +515,7 @@ function renderSummary(sc){
 function filtered(all){
   const q = $("#q").value.trim().toLowerCase(), c=$("#fCidade").value, m=$("#fMes").value;
   return scoped(all).filter(r => (!S.status.size || S.status.has(r.status)) && (!c || r.cidade===c) && (!m || r.mes===m)
-    && (!S.alertOnly || r.flags.length)
+    && (!S.alertOnly || (S.alertOnly==="pronta" ? r.flags.some(f=>f[1]==="ok") : r.flags.length))
     && (!q || [r.wd,r.carteira,r.superintendente,r.cidade,r.nota,...(r.hist||[]).map(h=>h.t),...(r.candidatos||[]).map(x=>x.id)].join(" ").toLowerCase().includes(q)));
 }
 function sortRows(list){
@@ -494,7 +525,7 @@ function sortRows(list){
 function renderKPIs(all){
   const open = all.filter(r=>OPEN.has(r.status));
   const vagas = open.reduce((a,r)=>a+Math.max(0,r.necessidade-(r.presente||0)),0);
-  const alerts = open.filter(r=>r.flags.some(f=>f[1]==="")).length;
+  const alerts = open.filter(r=>r.flags.some(f=>f[1]==="ok")).length;
   const t = todayISO(), ym=t.slice(0,7);
   const prox = open.filter(r=>r.alo && r.alo>=t && diffDays(r.alo,t)<=14).length;
   const d90 = all.filter(r=>r.status!=="CANCELADA" && r.inicioTreino && diffDays(t,r.inicioTreino)>=0 && diffDays(t,r.inicioTreino)<=90 && r.selecionados);
@@ -503,11 +534,11 @@ function renderKPIs(all){
   $("#kpis").innerHTML = [
     ["Em andamento", open.length, "abertas, editadas ou complementares", "open"],
     ["Vagas a preencher", fmtN(vagas), "necessidade − presentes", null],
-    ["ALO vencido", alerts, "sem completar a necessidade", "alert", alerts>0],
+    ["Prontas para entregar", alerts, "ALO já foi para a operação", "pronta", false, alerts>0],
     ["ALO em 14 dias", prox, "requisições em andamento", null],
     ["No-show 90 dias", sel? Math.round(ns/sel*100)+"%" : "—", `${ns} de ${sel} selecionados`, null],
     ["Entregues no mês", ent, `ALO em ${mesLabel(ym)}`, null],
-  ].map(([l,v,h,act,isAlert])=>`<${act?'button type="button"':'div'} class="kpi ${act?'click':''} ${isAlert?'alert':''}" ${act?`data-act="${act}"`:""}><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></${act?'button':'div'}>`).join("");
+  ].map(([l,v,h,act,isAlert,isReady])=>`<${act?'button type="button"':'div'} class="kpi ${act?'click':''} ${isAlert?'alert':''} ${isReady?'ready':''}" ${act?`data-act="${act}"`:""}><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></${act?'button':'div'}>`).join("");
 }
 const GCOLS = [
   {k:"wd", l:"Workday", t:"text", c:"w-wd mono"},
@@ -526,7 +557,7 @@ S.pinned = new Set();
 function cellHTML(col, r){
   const ro = !S.canWrite;
   if(col.k==="flag"){ if(!r.flags.length) return `<td class="ro"></td>`; const bad = r.flags.some(f=>f[1]===""); return `<td class="ro" title="${esc(r.flags.map(f=>f[0]).join(" · "))}"><span class="fl ${bad?"b":"w"}">!</span></td>`; }
-  if(col.k==="act") return `<td class="ro" style="padding:2px"><button type="button" class="rowmore" title="Histórico, candidatos e mais" aria-label="Detalhes de ${esc(r.wd)}">⋯</button></td>`;
+  if(col.k==="act") return `<td class="ro" style="padding:2px;white-space:nowrap">${S.canWrite && r.flags.some(f=>f[1]==="ok") ? `<button type="button" class="btn-ent" data-ent="${esc(r._id)}" title="ALO em ${esc(br(r.alo))}: marcar como ENTREGUE">✓ Entregar</button> ` : ""}<button type="button" class="rowmore" title="Histórico, candidatos e mais" aria-label="Detalhes de ${esc(r.wd)}">⋯</button></td>`;
   if(col.ro){ const v = r[col.k]; return `<td class="ro ${col.n?"n":""} ${col.tot?"tot":""}" data-ro="${col.k}">${esc(col.n ? fmtN(v) : (v||"—"))}</td>`; }
   const v = r[col.k]; const val = v==null ? "" : v;
   const lockList = col.list2 && (r.candidatos||[]).length;
@@ -540,7 +571,7 @@ function cellHTML(col, r){
 function rowHTML(r){ return `<tr data-id="${esc(r._id)}" class="${S.pinned.has(r._id)?"pin":""}">${GCOLS.map(c=>cellHTML(c,r)).join("")}</tr>`; }
 function renderTable(){
   const all = rows();
-  renderFilters(all); const sc = scoped(all); renderSummary(sc); renderKPIs(sc);
+  renderFilters(all); const sc = scoped(all); renderSummary(sc); renderKPIs(sc); renderReady(sc);
   const pinned = all.filter(r=>S.pinned.has(r._id));
   const list = sortRows(filtered(all).filter(r=>!S.pinned.has(r._id)));
   $("#count").textContent = `${list.length.toLocaleString("pt-BR")} de ${all.length.toLocaleString("pt-BR")} requisições`;
@@ -559,6 +590,23 @@ function refreshRow(tr){
   tr.querySelectorAll("[data-ro]").forEach(td=>{ const c = GCOLS.find(x=>x.k===td.dataset.ro); const v = d[c.k]; td.textContent = c.n ? fmtN(v) : (v||"—"); });
 }
 let saveQ = Promise.resolve();
+S.readyConfirm = false;
+function renderReady(sc){
+  const ready = sc.filter(r=>OPEN.has(r.status) && r.flags.some(f=>f[1]==="ok"));
+  const el = $("#readyBar");
+  if(!ready.length || !S.canWrite){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="notice" style="border-color:var(--ok);background:var(--ok-soft)"><p><b>${ready.length} ${ready.length>1?"requisições já foram":"requisição já foi"} para a operação</b> (ALO até hoje) e ${ready.length>1?"continuam":"continua"} em andamento. Confira e marque como entregue, uma a uma pelo botão ✓ Entregar ou todas de uma vez.</p>
+    ${S.readyConfirm ? `<span class="inline"><span>Marcar as ${ready.length} como ENTREGUE?</span><button class="btn primary sm" type="button" id="btnReadyYes">Sim, marcar</button><button class="btn sm" type="button" id="btnReadyNo">Cancelar</button></span>`
+      : `<button class="btn sm" type="button" id="btnReadyView">Ver só essas</button><button class="btn primary sm" type="button" id="btnReadyAll">Marcar todas como entregues</button>`}</div>`;
+}
+async function markDelivered(ids){
+  const now = new Date().toISOString(), by = S.me||null; let ok = 0;
+  for(const id of ids){ const raw = S.reqs.get(id); if(!raw || !OPEN.has(raw.status)) continue; const d = derive(raw);
+    const patch = {status:"ENTREGUE", atualizadoEm:now, atualizadoPor:by, hist:[...(raw.hist||[]), {d:now, t:`Status: ${raw.status} → ENTREGUE (ALO em ${br(d.alo)}, turma na operação)`, tipo:"status", by}]};
+    try{ await S.db.collection("reqs").doc(id).update(patch); S.reqs.set(id, {...raw, ...patch}); ok++; }catch(e){ writeErr(e); break; } }
+  if(ok) toast(ok>1 ? `${ok} requisições marcadas como entregues.` : "Requisição marcada como entregue.");
+  S.readyConfirm = false; schedule();
+}
 function cellChanged(el){
   const tr = el.closest("tr"), id = tr.dataset.id, raw = S.reqs.get(id); if(!raw || !S.canWrite) return;
   const f = el.dataset.f, now = new Date().toISOString(), by = S.me||null;
@@ -625,32 +673,53 @@ function renderSimulador(){
 function isBizDayRaw(isoD, sat){ const w = parse(isoD).getUTCDay(); return w!==0 && (sat || w!==6); }
 
 /* ---------- vagas entregues ---------- */
+function bizDaysBetween(a, b){ // dias de treinamento já cumpridos: de a (início, inclusive) até b (hoje, inclusive), seg–sáb sem feriados
+  if(!a || !b || b < a) return 0; let n = 0, d = a, guard = 0;
+  while(d <= b && guard++ < 400){ if(isBizDay(d, true)) n++; d = shiftDay(d, 1); } return n;
+}
 function renderEntregues(){
-  const all = rows(); const cid = $("#eCidade").value, incl = $("#eOpen").checked;
+  const all = rows(), t = todayISO(), cid = $("#eCidade").value, per = +$("#ePer").value;
   fillSelect($("#eCidade"), [...new Set(all.map(r=>r.cidade).filter(Boolean))].sort(), true);
-  const list = scoped(all).filter(r=>(!cid || r.cidade===cid) && (r.status==="ENTREGUE" || r.status==="FECHADA" || (incl && OPEN.has(r.status) && (r.presente||0)>0)))
-    .sort((a,b)=>(b.alo||b.inicioTreino||"").localeCompare(a.alo||a.inicioTreino||""));
-  const sum = l => l.reduce((a,r)=>({n:a.n+1, nec:a.nec+r.necessidade, sel:a.sel+(r.selecionados||0), pr:a.pr+(r.presente||0), ns:a.ns+(r.noShow||0)}), {n:0,nec:0,sel:0,pr:0,ns:0});
-  const T = sum(list), pc = (a,b) => b ? Math.round(a/b*100)+"%" : "—";
-  $("#entKpis").innerHTML = [
-    ["Requisições", T.n.toLocaleString("pt-BR"), incl?"entregues e em andamento":"entregues ou fechadas"],
-    ["Vagas solicitadas", fmtN(T.nec), "soma da necessidade"],
-    ["Vagas entregues", fmtN(T.pr), "presentes no treinamento"],
-    ["Atingimento", pc(T.pr,T.nec), "entregues ÷ solicitadas"],
-    ["No show / desistentes", fmtN(T.ns), `${pc(T.ns,T.sel)} dos ${fmtN(T.sel)} selecionados`],
-  ].map(([l,v,h])=>`<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></div>`).join("");
-  $("#countE").textContent = `${list.length.toLocaleString("pt-BR")} requisições`;
-  const groups = new Map(); list.forEach(r=>{ const k = (r.alo||r.inicioTreino||"").slice(0,7) || "sem"; (groups.get(k) || groups.set(k, []).get(k)).push(r); });
+  const base = scoped(all).filter(r=>r.status!=="CANCELADA" && r.status!=="MIGRADO/INTERNA" && (!cid || r.cidade===cid));
+  const sum = l => l.reduce((a,r)=>({n:a.n+1, nec:a.nec+r.necessidade, tot:a.tot+r.total, sel:a.sel+(r.selecionados||0), pr:a.pr+(r.presente||0), ns:a.ns+(r.noShow||0), dz:a.dz+(r.desist||0)}), {n:0,nec:0,tot:0,sel:0,pr:0,ns:0,dz:0});
+  const pc = (a,b) => b ? Math.round(a/b*100)+"%" : "—";
+  const bar = (p, cls="") => `<div class="fill"><div class="bar"><i class="${p>=1?"full":""} ${cls}" style="width:${Math.round(Math.min(1,p)*100)}%"></i></div><b>${Math.round(p*100)}%</b></div>`;
+  const kpis = (el, arr) => $(el).innerHTML = arr.map(([l,v,h])=>`<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></div>`).join("");
+  const src = r => r.sp ? `<span class="pill st-COMPLEMENTAR" title="${esc((r.sp.arquivos||[]).join(", "))}">SharePoint ${esc(br(r.sp.at.slice(0,10)))}</span>` : r.origem==="planilha" ? `<span class="hint">planilha</span>` : `<span class="hint">manual</span>`;
+
+  // em treinamento
+  const tr = base.filter(r=>r.inicioTreino && r.inicioTreino <= t && r.alo && r.alo > t).sort((a,b)=>a.alo.localeCompare(b.alo));
+  const T = sum(tr);
+  kpis("#eKpiT", [["Turmas em treinamento", T.n, "início já passou, ALO ainda não"], ["Vagas em treinamento", fmtN(T.nec), "soma da necessidade"], ["Presentes hoje", fmtN(T.pr), `${pc(T.pr,T.nec)} da necessidade`], ["No show", fmtN(T.ns-T.dz), "não compareceram"], ["Desistentes", fmtN(T.dz), "saíram durante o treinamento"]]);
+  $("#tbeT").innerHTML = tr.map(r=>{ const N = num(r.diasTreino)||0, k = Math.min(N, bizDaysBetween(r.inicioTreino, t)), p = r.necessidade ? (r.presente||0)/r.necessidade : 0, saldo = (r.presente||0) - r.necessidade;
+    return `<tr data-id="${esc(r._id)}" tabindex="0"><td><span class="mono">${esc(r.wd)}</span></td><td>${esc(r.carteira)}<span class="sub">${esc(r.superintendente||"")}</span></td><td>${esc(r.cidade)}</td>
+      <td><div class="prog"><div class="bar"><i style="width:${N?Math.round(k/N*100):0}%"></i></div><span>${N?`dia ${k} de ${N}`:"—"} · ALO ${esc(br(r.alo))}</span></div></td>
+      <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.selecionados)}</td><td class="n"><b>${fmtN(r.presente)}</b></td><td class="n">${fmtN(r.noShow!=null ? r.noShow-(r.desist||0) : null)}</td><td class="n">${r.desist?`<span class="neg">${r.desist}</span>`:"0"}</td>
+      <td>${bar(p)}</td><td class="n ${saldo<0?"neg":"pos"}">${saldo>0?"+":""}${fmtN(saldo)}</td><td>${src(r)}</td></tr>`; }).join("")
+    || `<tr><td colspan="12"><div class="empty"><p>Nenhuma turma em treinamento com esses filtros.</p></div></td></tr>`;
+
+  // próximas
+  const pr = base.filter(r=>r.inicioTreino && r.inicioTreino > t && diffDays(r.inicioTreino, t) <= 14).sort((a,b)=>a.inicioTreino.localeCompare(b.inicioTreino));
+  $("#tbeP").innerHTML = pr.map(r=>{ const cov = r.total ? (r.selecionados||0)/r.total : 0; const dd = diffDays(r.inicioTreino, t);
+    return `<tr data-id="${esc(r._id)}" tabindex="0"><td><span class="mono">${esc(r.wd)}</span></td><td>${esc(r.carteira)}</td><td>${esc(r.cidade)}</td><td>${esc(brW(r.inicioTreino))} <span class="hint">em ${dd} ${dd===1?"dia":"dias"}</span></td><td>${esc(br(r.alo))}</td>
+      <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.total)}</td><td class="n">${fmtN(r.selecionados)}</td><td>${bar(cov)}</td></tr>`; }).join("")
+    || `<tr><td colspan="9"><div class="empty"><p>Nenhuma turma começa nos próximos 14 dias.</p></div></td></tr>`;
+
+  // entregues à operação
+  const lim = per ? shiftDay(t, -per*30) : "";
+  const en = base.filter(r=>r.alo && r.alo <= t && (!lim || r.alo >= lim)).sort((a,b)=>b.alo.localeCompare(a.alo));
+  const E = sum(en);
+  kpis("#eKpiE", [["Turmas entregues", E.n, per?`ALO nos últimos ${per} meses`:"todo o período"], ["Vagas solicitadas", fmtN(E.nec), "soma da necessidade"], ["Vagas entregues", fmtN(E.pr), "presentes no ALO"], ["Atingimento", pc(E.pr,E.nec), "entregues ÷ solicitadas"], ["Perdas", fmtN(E.ns), `${pc(E.ns,E.sel)} dos selecionados · ${fmtN(E.dz)} desistentes`]]);
+  const groups = new Map(); en.forEach(r=>{ const k = r.alo.slice(0,7); (groups.get(k) || groups.set(k, []).get(k)).push(r); });
   let html = "";
   for(const [k, l] of groups){ const g = sum(l);
-    html += `<tr class="grp"><td colspan="4">${k==="sem" ? "Sem data de ALO" : mesLabel(k)} · ${g.n} requisições</td><td class="n">${fmtN(g.nec)}</td><td class="n">${fmtN(g.sel)}</td><td class="n">${fmtN(g.pr)}</td><td class="n">${fmtN(g.ns)}</td><td>${pc(g.pr,g.nec)}</td><td colspan="3"></td></tr>`;
-    html += l.map(r=>{ const p = r.necessidade ? Math.min(1,(r.presente||0)/r.necessidade) : 0;
-      return `<tr data-id="${esc(r._id)}" tabindex="0"><td><span class="mono">${esc(r.wd)}</span>${r.status!=="ENTREGUE"?` <span class="pill ${stCls(r.status)}">${esc(r.status)}</span>`:""}</td><td>${esc(r.superintendente)}</td><td>${esc(r.carteira)}</td><td>${esc(r.cidade)}</td>
-        <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.selecionados)}</td><td class="n"><b>${fmtN(r.presente)}</b></td><td class="n">${fmtN(r.noShow)}</td>
-        <td><div class="fill"><div class="bar"><i class="${p>=1?"full":""}" style="width:${Math.round(p*100)}%"></i></div><b>${Math.round(p*100)}%</b></div></td>
-        <td>${br(r.inicioTreino)}</td><td>${br(r.alo)}</td><td>${r.sp?`<span class="pill st-COMPLEMENTAR" title="${esc((r.sp.arquivos||[]).join(", "))}">SharePoint</span>`:r.origem==="planilha"?`<span class="hint">planilha</span>`:`<span class="hint">manual</span>`}</td></tr>`; }).join("");
+    html += `<tr class="grp"><td colspan="3">${mesLabel(k)} · ${g.n} ${g.n>1?"turmas":"turma"}</td><td class="n">${fmtN(g.nec)}</td><td class="n">${fmtN(g.sel)}</td><td class="n">${fmtN(g.pr)}</td><td class="n">${fmtN(g.ns-g.dz)}</td><td class="n">${fmtN(g.dz)}</td><td>${pc(g.pr,g.nec)}</td><td colspan="2"></td></tr>`;
+    html += l.map(r=>{ const p = r.necessidade ? (r.presente||0)/r.necessidade : 0;
+      return `<tr data-id="${esc(r._id)}" tabindex="0"><td><span class="mono">${esc(r.wd)}</span>${OPEN.has(r.status)?` <span class="flag ok">pronta para entregar</span>`:""}</td><td>${esc(r.carteira)}</td><td>${esc(r.cidade)}</td>
+        <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.selecionados)}</td><td class="n"><b>${fmtN(r.presente)}</b></td><td class="n">${fmtN(r.noShow!=null ? r.noShow-(r.desist||0) : null)}</td><td class="n">${fmtN(r.desist||0)}</td>
+        <td>${bar(p)}</td><td>${br(r.alo)}</td><td>${src(r)}</td></tr>`; }).join("");
   }
-  $("#tbe").innerHTML = html || `<tr><td colspan="12"><div class="empty"><h3>Nenhuma vaga entregue nesse filtro</h3><p>As requisições com status Entregue aparecem aqui, agrupadas pelo mês do ALO.</p></div></td></tr>`;
+  $("#tbeE").innerHTML = html || `<tr><td colspan="11"><div class="empty"><p>Nenhuma turma entregue nesse período.</p></div></td></tr>`;
 }
 
 /* ---------- painel ---------- */
@@ -794,7 +863,7 @@ function openReq(id){
   };
   const renderCands = () => {
     F("cands").innerHTML = cands.map((c,i)=>`<div class="cand"><span class="mono">${c.id.startsWith("n")?`<span class="hint">sem ID Workday · ${esc(c.id.slice(1,6))}</span>`:esc(c.id)}</span>
-      <span class="seg"><button type="button" class="p" data-ci="${i}" data-s="PRESENTE" aria-pressed="${c.s==="PRESENTE"}" ${ro?"disabled":""}>Presente</button><button type="button" class="n" data-ci="${i}" data-s="NO SHOW" aria-pressed="${c.s==="NO SHOW"}" ${ro?"disabled":""}>No show</button></span>${c.s==="PENDENTE"?`<span class="hint">sem presença</span>`:""}
+      <span class="seg"><button type="button" class="p" data-ci="${i}" data-s="PRESENTE" aria-pressed="${c.s==="PRESENTE"}" ${ro?"disabled":""}>Presente</button><button type="button" class="n" data-ci="${i}" data-s="NO SHOW" aria-pressed="${c.s==="NO SHOW"}" ${ro?"disabled":""}>No show</button></span>${c.s==="PENDENTE"?`<span class="hint">sem presença</span>`:c.d?`<span class="hint" style="color:var(--bad)">desistente</span>`:""}
       ${ro?"":`<button type="button" class="btn sm ghost" data-rm="${i}" aria-label="Remover ${esc(c.id)}">✕</button>`}</div>`).join("");
     recalc();
   };
@@ -937,12 +1006,17 @@ document.addEventListener("click", e=>{
   const gr = e.target.closest(".sum[data-grp]"); if(gr && S.tab!=="requisicoes"){ document.querySelector('.tab[data-tab="requisicoes"]').click(); }
   if(gr){ S.status = new Set(GROUPS[gr.dataset.grp]); S.alertOnly=false; $("#fAlert").setAttribute("aria-pressed",false); S.limit=100; renderTable(); return; }
   if(e.target.closest("#btnClearScope")){ ["fAno","fSup","fCart"].forEach(i=>$("#"+i).value=""); S.limit=100; renderAll(); return; }
-  const k = e.target.closest(".kpi[data-act]"); if(k){ if(k.dataset.act==="open"){ S.status=new Set(OPEN); S.alertOnly=false; } else { S.status=new Set(OPEN); S.alertOnly=true; } $("#fAlert").setAttribute("aria-pressed",S.alertOnly); renderTable(); return; }
+  const k = e.target.closest(".kpi[data-act]"); if(k){ if(k.dataset.act==="open"){ S.status=new Set(OPEN); S.alertOnly=false; } else { S.status=new Set(OPEN); S.alertOnly = k.dataset.act==="pronta" ? "pronta" : true; } $("#fAlert").setAttribute("aria-pressed",S.alertOnly===true); renderTable(); return; }
   const th = e.target.closest("#tbl th[data-k]"); if(th){ const kk=th.dataset.k; S.sort = {k:kk, dir: S.sort.k===kk ? -S.sort.dir : (["wd","carteira","cidade","status","nota"].includes(kk)?1:-1)}; renderTable(); return; }
   const rm = e.target.closest("#tb .rowmore"); if(rm){ openReq(rm.closest("tr").dataset.id); return; }
-  const er = e.target.closest("#tbe tr[data-id]"); if(er){ openReq(er.dataset.id); return; }
+  const er = e.target.closest("#v-entregues tr[data-id]"); if(er){ openReq(er.dataset.id); return; }
   const cr = e.target.closest("#tbc tr[data-cid]"); if(cr){ openCart(cr.dataset.cid); return; }
   const df = e.target.closest("[data-delfer]"); if(df){ saveFer(S.fer.filter(f=>f.data!==df.dataset.delfer)); return; }
+  const be = e.target.closest("[data-ent]"); if(be){ markDelivered([be.dataset.ent]); return; }
+  if(e.target.closest("#btnReadyAll")){ S.readyConfirm = true; renderTable(); return; }
+  if(e.target.closest("#btnReadyNo")){ S.readyConfirm = false; renderTable(); return; }
+  if(e.target.closest("#btnReadyYes")){ const sc = scoped(rows()); markDelivered(sc.filter(r=>OPEN.has(r.status) && r.flags.some(f=>f[1]==="ok")).map(r=>r._id)); return; }
+  if(e.target.closest("#btnReadyView")){ S.status=new Set(OPEN); S.alertOnly="pronta"; $("#fAlert").setAttribute("aria-pressed",false); renderTable(); return; }
   if(e.target.closest("#btnMore")){ S.limit+=200; renderTable(); return; }
   if(e.target.closest("#btnNew")){ addRow(); return; }
   if(e.target.closest("#btnNewCart")){ openCart(null); return; }
@@ -952,13 +1026,13 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
-  if(e.key==="Enter" && e.target.matches("#tbc tr, #tbe tr")) e.target.click();
+  if(e.key==="Enter" && e.target.matches("#tbc tr, #v-entregues tr[data-id]")) e.target.click();
 });
 ["q","fCidade","fMes"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderTable(); }));
 ["fAno","fSup","fCart"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderAll(); }));
 ["pAno","pCidade"].forEach(id=>$("#"+id).addEventListener("change", renderPainel));
 $("#qc").addEventListener("input", renderCarteiras);
-["eCidade","eOpen"].forEach(id=>$("#"+id).addEventListener("change", renderEntregues));
+["eCidade","ePer"].forEach(id=>$("#"+id).addEventListener("change", renderEntregues));
 $("#simAb").value = todayISO(); { const p = simPrefs(); $("#simMode").value = p.m; $("#simCap").checked = p.c; }
 ["simAb","simMode","simCap","simQ","simCid","simSup"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ try{ localStorage.setItem("sim.mode", $("#simMode").value); localStorage.setItem("sim.cap", $("#simCap").checked?"1":"0"); }catch{} renderSimulador(); }));
 $("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#ferData").value, n=$("#ferNome").value.trim(); if(!d||!n) return; saveFer([...S.fer.filter(f=>f.data!==d), {data:d,nome:n}]); e.target.reset(); });
@@ -1034,9 +1108,11 @@ function parseSheet(text, fileWD){
     if(!id) continue;
     const p = normH(get(cols.p)), fin = normH(get(cols.fin)), des = normH(get(cols.des));
     let s = "PENDENTE";
-    if(/NO.?SHOW|DESIST|FALT/.test(p) || /DESIST/.test(fin) || (des && !/^(NAO|N|-|--)$/.test(des))) s = "NO SHOW";
+    let d = false;
+    if(/DESIST/.test(p) || /DESIST/.test(fin) || (des && !/^(NAO|N|-|--)$/.test(des))){ s = "NO SHOW"; d = true; }
+    else if(/NO.?SHOW|FALT/.test(p)) s = "NO SHOW";
     else if(/PRESEN/.test(p)) s = "PRESENTE";
-    rows.push({wd, id, s, ...(fin ? {fin: fin.slice(0,40)} : {})});
+    rows.push({wd, id, s, ...(d ? {d:true} : {}), ...(fin ? {fin: fin.slice(0,40)} : {})});
   }
   return rows;
 }
@@ -1067,15 +1143,15 @@ async function spSync(force){
         const byId = new Map(); const names = [];
         for(const [itemId, name, drv] of t.files){ names.push(name);
           const rows = parseSheet(await spRead(`file:///${drv||SP.drive}/${itemId}`), t.wd);
-          rows.filter(x=>x.wd===t.wd).forEach(x=>{ const prev = byId.get(x.id); if(!prev || prev.s==="PENDENTE" || x.s==="NO SHOW") byId.set(x.id, {id:x.id, s:x.s, ...(x.fin?{fin:x.fin}:{})}); });
+          rows.filter(x=>x.wd===t.wd).forEach(x=>{ const prev = byId.get(x.id); if(!prev || prev.s==="PENDENTE" || x.s==="NO SHOW") byId.set(x.id, {id:x.id, s:x.s, ...(x.d?{d:true}:{}), ...(x.fin?{fin:x.fin}:{})}); });
         }
         const cands = [...byId.values()];
         const cur = S.reqs.get(t.docId) || t.r;
         if(cands.length && JSON.stringify(cands) !== JSON.stringify(cur.candidatos||[])){
-          const pr = cands.filter(c=>c.s==="PRESENTE").length, ns = cands.filter(c=>c.s==="NO SHOW").length, pe = cands.length-pr-ns;
+          const pr = cands.filter(c=>c.s==="PRESENTE").length, ns = cands.filter(c=>c.s==="NO SHOW").length, pe = cands.length-pr-ns, dz = cands.filter(c=>c.d).length;
           const old = cur.candidatos||[]; const oPr = old.filter(c=>c.s==="PRESENTE").length, oNs = old.filter(c=>c.s==="NO SHOW").length;
           const hist = [...(cur.hist||[])];
-          if(pr!==oPr || ns!==oNs) hist.push({d:new Date().toISOString(), t:`SharePoint: ${pr} presentes, ${ns} no show/desistentes${pe?`, ${pe} sem presença marcada`:""} (${cands.length} na lista).`, tipo:"status", fonte:"sharepoint"});
+          if(pr!==oPr || ns!==oNs) hist.push({d:new Date().toISOString(), t:`SharePoint: ${pr} presentes, ${ns-dz} no show, ${dz} desistentes${pe?`, ${pe} sem presença marcada`:""} (${cands.length} na lista).`, tipo:"status", fonte:"sharepoint"});
           await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names}});
           changed++;
         } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
