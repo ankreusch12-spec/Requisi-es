@@ -819,6 +819,7 @@ function openReq(id){
         <div class="f wide" style="display:flex;flex-direction:column;gap:6px">
           <span class="hint">${r.sp ? `Lista lida do SharePoint em ${br(r.sp.at.slice(0,10))} ${r.sp.at.slice(11,16)} · ${esc((r.sp.arquivos||[]).join(", "))}` : "Lista de candidatos (opcional). Com a lista preenchida, os números acima são contados automaticamente."}</span>
           ${ro?"":`<div class="inline"><textarea id="r_paste" rows="2" placeholder="Cole IDs do Workday, um por linha ou separados por vírgula"></textarea><button class="btn sm" type="button" id="btnAddC">Adicionar</button></div>`}
+          ${src && SP.mcp && !ro ? `<button class="btn sm" type="button" id="btnSpOne" style="align-self:flex-start">⇄ Atualizar esta requisição pelo SharePoint</button>` : ""}
           <div class="cands" id="cands"></div>
         </div>
       </fieldset>
@@ -876,6 +877,7 @@ function openReq(id){
   host.addEventListener("change", e=>{ if(e.target.id==="r_carteira") recalc("cart"); if(e.target.id==="r_aloMan") recalc(); });
   host.addEventListener("click", e=>{
     const t = e.target.closest("button,[data-close]"); if(!t) return;
+    if(t.id==="btnSpOne"){ t.disabled = true; t.textContent = "Procurando no SharePoint…"; spSync(false, id).then(()=>{ toast(SP.msg); if(S.reqs.get(id)) openReq(id); }); return; }
     if(t.id==="btnSug"){ F("r_ini").value = suggestedStart(); recalc(); }
     if(t.id==="btnAddC"){ const ids = F("r_paste").value.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean); const have=new Set(cands.map(c=>c.id)); ids.forEach(i=>{ if(!have.has(i)){ cands.push({id:i,s:"PRESENTE"}); have.add(i);} }); F("r_paste").value=""; renderCands(); }
     if(t.dataset.ci!=null){ cands[+t.dataset.ci].s = t.dataset.s; renderCands(); }
@@ -1042,9 +1044,7 @@ const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrh
   roots:[
     {nome:"Curitiba", id:"01ZYDITNQ52GUQRXBBNJHYXE6HJ4QMM6XU", cidade:true},
     {nome:"Ponta Grossa", id:"01ZYDITNS4CK4IHNQNABAZE2Y4SW2HRUS4", cidade:true},
-    {nome:"São Paulo · Claro + Net", id:"01ZYDITNVWW6QVTAEFYBH32KB3KOHG5W57"},
-    {nome:"São Paulo · Smiles", id:"01ZYDITNWQVCIAY7KK3JBYJP3LZIVOZHD5"},
-    {nome:"São Paulo (arquivos soltos na pasta)", id:"01ZYDITNUVVRHHC3ABDBE2RNFZ3XTWZQCI", raso:true},
+    {nome:"São Paulo", id:"01ZYDITNUVVRHHC3ABDBE2RNFZ3XTWZQCI", cidade:true},
   ], mcp:null, state:"off", msg:"", index:null, meta:null, running:false, prog:"" };
 const normWD = s => { const m = String(s||"").toUpperCase().match(/R\s*0*(\d{6,8})/); return m ? "R"+m[1] : ""; };
 const normH = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
@@ -1162,30 +1162,87 @@ function parseSheet(text, fileWD){
   }
   return rows;
 }
-function spTargets(){
+function spTargets(onlyId){
   const t = todayISO(), out = [];
   for(const [docId, r] of S.reqs){
-    if(r.status==="CANCELADA") continue;
-    const wd = normWD(r.wd); const f = SP.index?.files?.[wd]; if(!f) continue;
+    if(onlyId && docId!==onlyId) continue;
+    if(!onlyId && r.status==="CANCELADA") continue;
+    const wd = normWD(r.wd); if(!wd) continue;
     const recent = (r.inicioTreino && diffDays(t, r.inicioTreino) <= 60) || (r.alo && diffDays(t, r.alo) <= 45);
-    if(OPEN.has(r.status) || recent) out.push({docId, r, wd, files:f});
+    if(onlyId || OPEN.has(r.status) || recent) out.push({docId, r, wd});
   }
   return out;
 }
-async function spSync(force){
+// procura os arquivos de UMA requisição: pasta da cidade dela → pasta da conta da carteira → subpastas recentes
+function reqTokens(r){
+  const t = new Set(toks(r.carteira||"")); const c = cartByName(r.carteira);
+  if(c) toks([c.conta, c.agrupamento].join(" ")).forEach(w=>t.add(w));
+  if(t.has("CLARO") || t.has("NET") || t.has("MPLAY")) ["CLARO","NET","RCV","ESCOB","MPLAY"].forEach(w=>t.add(w));
+  if(t.has("NATURA") || t.has("AVON")) ["NATURA","AVON"].forEach(w=>t.add(w));
+  if(t.has("CARREFOUR") || t.has("ATACADAO")) ["CARREFOUR","ATACADAO"].forEach(w=>t.add(w));
+  if(t.has("VAREJO")) t.add("VIA");
+  if(t.has("SAM")) t.add("SAMS");
+  if(t.has("OI") || t.has("VITAL")) t.add("VITAL");
+  return t;
+}
+function cityRoots(r){
+  const c = normH(r.cidade||"");
+  const m = SP.roots.filter(x=>normH(x.nome).startsWith(c.slice(0,5)) && c);
+  return m.length ? m : SP.roots;
+}
+async function spList(uri, ctx){
+  if(ctx.list.has(uri)) return ctx.list.get(uri);
+  const p = (async () => { const all = []; let page = null, guard = 0;
+    do{ const {items, next} = parseListing(await spRead(uri, page)); all.push(...items); page = next; guard++; } while(page && guard < 20);
+    ctx.folders++; return all; })();
+  ctx.list.set(uri, p); p.catch(()=>ctx.list.delete(uri)); return p;
+}
+async function spFind(t, ctx){
+  const {r, wd} = t, my = reqTokens(r), found = new Map();
+  const ref = r.inicioTreino || r.abertura || todayISO();
+  const lo = shiftDay(ref, -45), hi = shiftDay(ref, 75);
+  const limYM = +lo.slice(0,4)*100 + +lo.slice(5,7);
+  const oldFolder = name => { const {ano, mes} = folderPeriod(name); return ano ? ano*100 + (mes||12) < limYM : false; };
+  const visit = async (uri, depth, isCityRoot) => {
+    if(depth > 5) return;
+    const items = await spList(uri, ctx);
+    const subs = [];
+    for(const it of items){
+      if(it.type==="folder"){
+        if(oldFolder(it.name)) continue;
+        if(isCityRoot){ const p = folderPeriod(it.name); if(!(p.mes || p.ano) && !toks(it.name).some(w=>my.has(w))) continue; }
+        subs.push(`file:///${it.drive}/${it.id}`);
+      } else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){
+        const nwd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
+        const rec = [it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive];
+        if(nwd){ if(nwd===wd) found.set(it.id, rec); continue; }
+        const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const d = m ? `${m[3].length===2?"20"+m[3]:m[3]}-${m[2]}-${m[1]}` : null;
+        if(d && (d < lo || d > hi)) continue;
+        let wds = ctx.scanned[it.id]?.[0];
+        if(!wds){ wds = [...new Set(parseSheet(await spRead(`file:///${it.drive}/${it.id}`), "").map(x=>x.wd).filter(Boolean))]; ctx.scanned[it.id] = [wds, rec[1], rec[2]]; ctx.newScan = true; }
+        if(wds.includes(wd)) found.set(it.id, rec);
+      }
+    }
+    for(const u of subs) await visit(u, depth+1, false);
+  };
+  for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true);
+  return [...found.values()];
+}
+async function spSync(force, onlyId){
   if(SP.running || !SP.mcp || !S.db || !S.canWrite) return;
   SP.running = true; SP.state = "run"; SP.msg = ""; renderSpBar();
   const lock = S.db.doc("sp/lock");
   try{
     const l = await lock.acquire({holder: S.me || "anon", ttlMs: 300000}).catch(()=>({acquired:true}));
     if(!l.acquired){ SP.state = "ok"; SP.msg = "Outra pessoa está sincronizando agora. Os dados chegam em instantes."; return; }
-    const age = SP.index?.crawledAt ? (Date.now() - Date.parse(SP.index.crawledAt))/36e5 : 99;
     SP.errLog = {};
-    if(!SP.index || age > 6 || (SP.index.failed||0) > 0 || (force && age > 1)) await spCrawl();
-    const targets = spTargets(); let done = 0, changed = 0, errs = 0;
+    const ctx = {list:new Map(), scanned:{...(SP.index?.scanned||{})}, files:{...(SP.index?.files||{})}, folders:0, newScan:false};
+    const targets = spTargets(onlyId); let done = 0, changed = 0, errs = 0, semArquivo = 0;
     await pool(targets, 2, async t => {
-      SP.prog = `Lendo turmas no SharePoint… ${done} de ${targets.length}`; renderSpBar();
+      SP.prog = onlyId ? `Procurando a lista de presença da ${t.wd}…` : `Conferindo requisição ${done+1} de ${targets.length} (${t.wd})… ${ctx.folders} pastas abertas`; renderSpBar();
       try{
+        t.files = await spFind(t, ctx); ctx.files[t.wd] = t.files;
+        if(!t.files.length){ semArquivo++; done++; return; }
         const byId = new Map(); const names = [];
         for(const [itemId, name, drv] of t.files){ names.push(name);
           const rows = parseSheet(await spRead(`file:///${drv||SP.drive}/${itemId}`), t.wd);
@@ -1203,10 +1260,16 @@ async function spSync(force){
         } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
       }catch(e){ errs++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
       done++; });
-    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, erros:errs, pastasComFalha:SP.index?.failed||0, motivos:SP.errLog};
+    const idx = {crawledAt:new Date().toISOString(), by:S.me||null, files:ctx.files, scanned:ctx.scanned};
+    if(JSON.stringify(idx).length > 240000){ const mine = new Set([...S.reqs.values()].map(x=>normWD(x.wd))); idx.files = Object.fromEntries(Object.entries(ctx.files).filter(([k])=>mine.has(k))); }
+    await S.db.doc("sp/index").set(idx).catch(()=>{}); SP.index = idx;
+    if(onlyId){ const t0 = targets[0]; SP.state = errs ? "err" : "ok";
+      SP.msg = !t0 ? "Requisição sem número do Workday." : errs ? `Não foi possível ler a ${t0.wd} agora. Tente de novo em instantes.` : !t0.files?.length ? `Nenhuma lista de presença encontrada para a ${t0.wd} na pasta de ${t0.r.cidade||"nenhuma cidade"} da conta ${t0.r.carteira||"?"}.` : `${t0.wd}: ${t0.files.length} ${t0.files.length>1?"listas lidas":"lista lida"} (${t0.files.map(f=>f[1]).join(", ")}).`;
+      return; }
+    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, semArquivo, erros:errs, pastas:ctx.folders, motivos:SP.errLog};
     await S.db.doc("sp/status").set(meta).catch(()=>{});
     const mot = Object.entries(SP.errLog).sort((a,b)=>b[1].n-a[1].n)[0];
-    SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
+    SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas, ${semArquivo} ainda sem lista de presença${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
   }catch(e){ spError(e); }
   finally{ SP.running = false; SP.prog = ""; renderSpBar(); }
 }
@@ -1225,7 +1288,7 @@ function renderSpBar(){
   const when = SP.meta?.at ? new Date(SP.meta.at) : null;
   const ago = when ? Math.round((Date.now()-when)/6e4) : null;
   const agoTxt = ago==null ? "ainda não sincronizado" : ago < 1 ? "agora" : ago < 60 ? `há ${ago} min` : ago < 1440 ? `há ${Math.round(ago/60)} h` : `em ${br(SP.meta.at.slice(0,10))}`;
-  el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b> <span class="hint">Curitiba, Ponta Grossa e São Paulo (Claro + Net, Smiles)</span><span class="sub">${
+  el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b> <span class="hint">Curitiba, Ponta Grossa e São Paulo · cada requisição é procurada na pasta da sua cidade e da sua conta</span><span class="sub">${
     SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Presentes e no show das turmas, atualizados ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
     SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
     : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync">Sincronizar agora</button>` : ""}</div>`;
