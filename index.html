@@ -1040,8 +1040,8 @@ $("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#fe
 /* ---------- SharePoint (Microsoft 365) ---------- */
 const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrhdv7WpHnGztjhRK6kSuTrXlRyj_aiJA",
   roots:[
-    {nome:"Curitiba", id:"01ZYDITNQ52GUQRXBBNJHYXE6HJ4QMM6XU"},
-    {nome:"Ponta Grossa", id:"01ZYDITNS4CK4IHNQNABAZE2Y4SW2HRUS4"},
+    {nome:"Curitiba", id:"01ZYDITNQ52GUQRXBBNJHYXE6HJ4QMM6XU", cidade:true},
+    {nome:"Ponta Grossa", id:"01ZYDITNS4CK4IHNQNABAZE2Y4SW2HRUS4", cidade:true},
     {nome:"São Paulo · Claro + Net", id:"01ZYDITNVWW6QVTAEFYBH32KB3KOHG5W57"},
     {nome:"São Paulo · Smiles", id:"01ZYDITNWQVCIAY7KK3JBYJP3LZIVOZHD5"},
     {nome:"São Paulo (arquivos soltos na pasta)", id:"01ZYDITNUVVRHHC3ABDBE2RNFZ3XTWZQCI", raso:true},
@@ -1061,6 +1061,26 @@ async function spRead(uri, startPage){
       await new Promise(r=>setTimeout(r, Math.max(e?.retryAfterMs||0, waits[tries]) + Math.random()*1000)); }
   }
 }
+// só pastas das suas contas e dos últimos 6 meses
+const MESES_N = {JANEIRO:1,FEVEREIRO:2,MARCO:3,ABRIL:4,MAIO:5,JUNHO:6,JULHO:7,AGOSTO:8,SETEMBRO:9,OUTUBRO:10,NOVEMBRO:11,DEZEMBRO:12};
+const STOPW = new Set(["CLUB","BANCO","TELECOM","ATIVO","INATIVO","BRASIL","FATOR","GRUPO","VENDAS","COBRANCA","PME","EMPRESAS","MES","VIGENTE","PURO","CWB","PG","SP"]);
+const toks = str => normH(str).replace(/[^A-Z0-9]+/g," ").split(" ").filter(w=>w.length>=3 && !STOPW.has(w));
+function myTokens(){
+  const t = new Set();
+  [...S.cart.values()].forEach(c=>toks([c.nome,c.conta,c.agrupamento,c.activity].join(" ")).forEach(w=>t.add(w)));
+  S.reqs.forEach(r=>{ if(r.status!=="CANCELADA") toks(r.carteira||"").forEach(w=>t.add(w)); });
+  if(t.has("CLARO") || t.has("NET")) ["CLARO","NET","RCV","ESCOB","MPLAY"].forEach(w=>t.add(w));
+  if(t.has("NATURA") || t.has("AVON")) ["NATURA","AVON"].forEach(w=>t.add(w));
+  if(t.has("CARREFOUR") || t.has("ATACADAO")) ["CARREFOUR","ATACADAO"].forEach(w=>t.add(w));
+  if(t.has("VAREJO")) t.add("VIA");
+  if(t.has("SAM")) t.add("SAMS");
+  return t;
+}
+function folderPeriod(name){ const n = normH(name); const y = n.match(/(^|[^0-9])(20\d\d)([^0-9]|$)/); const m = Object.entries(MESES_N).find(([k])=>n.includes(k));
+  return {ano: y ? +y[2] : null, mes: m ? m[1] : null}; }
+function folderTooOld(name){ const {ano, mes} = folderPeriod(name); if(!ano) return false;
+  const lim = new Date(); lim.setMonth(lim.getMonth()-6); const limYM = lim.getFullYear()*100 + lim.getMonth()+1;
+  return ano*100 + (mes||12) < limYM; }
 // fila com trabalhadores que só param quando não há mais nada pendente nem em andamento
 async function pool(items, n, fn){
   const q = [...items]; let active = 0;
@@ -1081,12 +1101,19 @@ function parseListing(text){
 async function spCrawl(){
   const files = {}, unk = []; let folders = 0, failed = 0;
   const limitDate = iso(new Date(Date.now()-120*864e5));
-  const listFolder = async ({uri, raso}, push) => { folders++;
+  const MY = myTokens(); let pulados = 0;
+  const keep = (it, nivel1Cidade) => {
+    if(folderTooOld(it.name)) return false;
+    if(!nivel1Cidade) return true;
+    const p = folderPeriod(it.name); if(p.mes || p.ano) return true; // pasta de mês recente
+    return toks(it.name).some(w=>MY.has(w));
+  };
+  const listFolder = async ({uri, raso, cidade}, push) => { folders++;
     if(folders > 2500) return;
-    SP.prog = `Lendo pastas do SharePoint… ${folders} pastas, ${Object.keys(files).length} requisições encontradas`; renderSpBar();
+    SP.prog = `Lendo pastas das suas contas… ${folders} lidas, ${pulados} ignoradas (outros clientes ou antigas), ${Object.keys(files).length} requisições encontradas`; renderSpBar();
     try{ let page = null, guard = 0;
       do{ const {items, next} = parseListing(await spRead(uri, page)); page = next; guard++;
-        items.forEach(it=>{ if(it.type==="folder"){ if(!raso) push({uri:`file:///${it.drive}/${it.id}`, raso:false}); }
+        items.forEach(it=>{ if(it.type==="folder"){ if(raso) return; if(keep(it, cidade)) push({uri:`file:///${it.drive}/${it.id}`, raso:false, cidade:false}); else pulados++; }
           else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
             if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]);
             else { const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const y = m ? (m[3].length===2 ? "20"+m[3] : m[3]) : null;
@@ -1094,7 +1121,7 @@ async function spCrawl(){
       } while(page && guard < 20);
     }catch(e){ failed++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
   };
-  await pool(SP.roots.map(r=>({uri:`file:///${SP.drive}/${r.id}`, raso:!!r.raso})), 3, listFolder);
+  await pool(SP.roots.map(r=>({uri:`file:///${SP.drive}/${r.id}`, raso:!!r.raso, cidade:!!r.cidade})), 3, listFolder);
   // se uma pasta falhou, mantém o que ela tinha no índice anterior
   if(failed && SP.index?.files) Object.entries(SP.index.files).forEach(([wd,l])=>{ const cur = files[wd] = files[wd]||[]; l.forEach(f=>{ if(!cur.some(x=>x[0]===f[0])) cur.push(f); }); });
   // arquivos sem número de requisição no nome: lê o conteúdo uma vez e guarda quais requisições estão nele
@@ -1104,7 +1131,7 @@ async function spCrawl(){
     try{ const wds = [...new Set(parseSheet(await spRead(`file:///${it.drive}/${it.id}`), "").map(x=>x.wd).filter(Boolean))]; scanned[it.id] = [wds, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]; }
     catch(e){ failed++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; } });
   Object.entries(scanned).forEach(([id,[wds,name,drv]])=>wds.forEach(wd=>{ const l = files[wd] = files[wd]||[]; if(!l.some(f=>f[0]===id)) l.push([id,name,drv]); }));
-  let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, scanned, folders, failed};
+  let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, scanned, folders, pulados, failed};
   if(JSON.stringify(doc).length > 240000){ const mine = new Set([...S.reqs.values()].map(r=>normWD(r.wd))); doc.files = Object.fromEntries(Object.entries(files).filter(([k])=>mine.has(k))); }
   await S.db.doc("sp/index").set(doc);
   SP.index = doc; return doc;
@@ -1141,7 +1168,7 @@ function spTargets(){
     if(r.status==="CANCELADA") continue;
     const wd = normWD(r.wd); const f = SP.index?.files?.[wd]; if(!f) continue;
     const recent = (r.inicioTreino && diffDays(t, r.inicioTreino) <= 60) || (r.alo && diffDays(t, r.alo) <= 45);
-    if(OPEN.has(r.status) || recent || !r.sp) out.push({docId, r, wd, files:f});
+    if(OPEN.has(r.status) || recent) out.push({docId, r, wd, files:f});
   }
   return out;
 }
