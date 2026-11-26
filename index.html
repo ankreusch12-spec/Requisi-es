@@ -1203,14 +1203,16 @@ async function spFind(t, ctx){
   const lo = shiftDay(ref, -45), hi = shiftDay(ref, 75);
   const limYM = +lo.slice(0,4)*100 + +lo.slice(5,7);
   const oldFolder = name => { const {ano, mes} = folderPeriod(name); return ano ? ano*100 + (mes||12) < limYM : false; };
-  const visit = async (uri, depth, isCityRoot) => {
+  const visit = async (uri, depth, isCityRoot, todaCidade) => {
     if(depth > 5) return;
-    const items = await spList(uri, ctx);
+    let items;
+    try{ items = await spList(uri, ctx); }
+    catch(e){ if(SP_AUTH.includes(e?.code) || depth===0) throw e; spLogErr(e); ctx.pastasFalha = (ctx.pastasFalha||0)+1; return; }
     const subs = [];
     for(const it of items){
       if(it.type==="folder"){
         if(oldFolder(it.name)) continue;
-        if(isCityRoot){ const p = folderPeriod(it.name); if(!(p.mes || p.ano) && !toks(it.name).some(w=>my.has(w))) continue; }
+        if(isCityRoot && !todaCidade){ const p = folderPeriod(it.name); if(!(p.mes || p.ano) && !toks(it.name).some(w=>my.has(w))) continue; }
         subs.push(`file:///${it.drive}/${it.id}`);
       } else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){
         const nwd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
@@ -1223,9 +1225,12 @@ async function spFind(t, ctx){
         if(wds.includes(wd)) found.set(it.id, rec);
       }
     }
-    for(const u of subs) await visit(u, depth+1, false);
+    for(const u of subs) await visit(u, depth+1, false, todaCidade);
   };
-  for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true);
+  // 1ª tentativa: pasta da cidade → pasta da conta da carteira
+  for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, false);
+  // 2ª tentativa: não achou? procura o código em todas as pastas da cidade (só as do período da turma)
+  if(!found.size){ t.busca = "cidade"; for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, true); }
   return [...found.values()];
 }
 async function spSync(force, onlyId){
