@@ -67,6 +67,18 @@ main{padding-block:16px 48px}
 .kpi .v{font-family:var(--f-display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .h{font-size:12px;color:var(--fg-2)}
 .kpi.alert .v{color:var(--bad)}
+.scope{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:flex-end;margin-bottom:12px}
+.scope label.f{flex:1 1 180px;max-width:320px}
+.scope select{width:100%}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;border-top:4px solid var(--c,var(--line-strong))}
+.sum:hover{background:var(--surface-2)}
+.sum[aria-pressed="true"]{outline:2px solid var(--c);outline-offset:-1px}
+.sum .l{font-size:12px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:var(--c,var(--fg-2))}
+.sum .v{font-family:var(--f-display);font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.sum .h{font-size:12.5px;color:var(--fg-2)}
+.sum .pc{font-size:13px;font-weight:600;color:var(--fg-2)}
+.sum.ent{--c:var(--ok)} .sum.can{--c:var(--bad)} .sum.abe{--c:var(--info)} .sum.tot{--c:var(--fg-2);cursor:default}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .filters input[type=search]{flex:1 1 220px;min-width:0}
 .field,select,input[type=text],input[type=search],input[type=number],input[type=date],textarea{border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);padding:7px 9px;min-width:0}
@@ -183,11 +195,17 @@ label.f input,label.f select{width:100%}
   <div id="banner"></div>
 
   <section id="v-requisicoes">
+    <div class="scope">
+      <label class="f">Ano de abertura<select id="fAno"><option value="">Todos os anos</option></select></label>
+      <label class="f">Gerência<select id="fSup"><option value="">Todas as gerências</option></select></label>
+      <label class="f">Carteira<select id="fCart"><option value="">Todas as carteiras</option></select></label>
+      <button class="btn ghost sm" type="button" id="btnClearScope" hidden>Limpar filtros</button>
+    </div>
+    <div class="summary" id="summary"></div>
     <div class="kpis" id="kpis"></div>
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar requisição, carteira, acompanhamento…" aria-label="Buscar">
       <select id="fCidade" aria-label="Cidade"><option value="">Todas as cidades</option></select>
-      <select id="fSup" aria-label="Superintendente"><option value="">Todos os superintendentes</option></select>
       <select id="fMes" aria-label="Mês do ALO"><option value="">Todos os meses (ALO)</option></select>
     </div>
     <div class="filters">
@@ -331,7 +349,7 @@ function derive(r){
   if(S.dupes.has((r.wd||"").toUpperCase())) flags.push(["WD duplicado","w"]);
   return {...r, necessidade:nec, buffer:buf, total, selecionados:sel, noShow:ns, presente:pr, alo,
     pct: nec ? Math.min(1,(pr||0)/nec) : 0, nota: lastNote ? lastNote.t : "", lastDate, flags,
-    mes: alo ? alo.slice(0,7) : "", ano: alo ? alo.slice(0,4) : ""};
+    mes: alo ? alo.slice(0,7) : "", ano: alo ? alo.slice(0,4) : "", anoAb: (r.abertura||r.inicioTreino||alo||"").slice(0,4)};
 }
 S.dupes = new Set();
 function rows(){
@@ -346,7 +364,11 @@ function mesLabel(m){ const [y,mm]=m.split("-"); return `${MESES[+mm-1]} ${y}`; 
 function renderFilters(all){
   fillSelect($("#fCidade"), [...new Set(all.map(r=>r.cidade).filter(Boolean))].sort(), true);
   fillSelect($("#pCidade"), [...new Set(all.map(r=>r.cidade).filter(Boolean))].sort(), true);
+  fillSelect($("#fAno"), [...new Set(all.map(r=>r.anoAb).filter(Boolean))].sort().reverse(), true);
   fillSelect($("#fSup"), [...new Set(all.map(r=>r.superintendente).filter(Boolean))].sort(), true);
+  const sup = $("#fSup").value;
+  fillSelect($("#fCart"), [...new Set(all.filter(r=>!sup || r.superintendente===sup).map(r=>r.carteira).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR")), true);
+  $("#btnClearScope").hidden = !($("#fAno").value || sup || $("#fCart").value);
   const meses = [...new Set(all.map(r=>r.mes).filter(Boolean))].sort().reverse();
   const fm = $("#fMes"), cur = fm.value;
   fm.innerHTML = `<option value="">Todos os meses (ALO)</option>` + meses.map(m=>`<option value="${m}">${mesLabel(m)}</option>`).join("");
@@ -360,9 +382,29 @@ function renderFilters(all){
   $("#dlCarteiras").innerHTML = [...S.cart.values()].map(c=>`<option value="${esc(c.nome)}">`).join("");
   $("#dlSup").innerHTML = [...new Set([...S.cart.values()].map(c=>c.superintendente).filter(Boolean))].sort().map(s=>`<option value="${esc(s)}">`).join("");
 }
+function scoped(all){
+  const a=$("#fAno").value, s=$("#fSup").value, ct=$("#fCart").value;
+  return all.filter(r => (!a || r.anoAb===a) && (!s || r.superintendente===s) && (!ct || r.carteira===ct));
+}
+const GROUPS = { ent:["ENTREGUE","FECHADA"], can:["CANCELADA"], abe:["ABERTO","EDITADA","COMPLEMENTAR"] };
+function renderSummary(sc){
+  const g = k => sc.filter(r=>GROUPS[k].includes(r.status));
+  const tot = sc.length, pc = n => tot ? Math.round(n/tot*100)+"%" : "—";
+  const vag = l => fmtN(l.reduce((a,r)=>a+r.necessidade,0));
+  const ent=g("ent"), can=g("can"), abe=g("abe"), mig=sc.filter(r=>r.status==="MIGRADO/INTERNA").length;
+  const same = k => S.status.size===GROUPS[k].length && GROUPS[k].every(x=>S.status.has(x)) && !S.alertOnly;
+  const parts = [$("#fAno").value && `em ${$("#fAno").value}`, $("#fSup").value && `gerência ${$("#fSup").value}`, $("#fCart").value].filter(Boolean);
+  const scopeTxt = parts.length ? parts.join(" · ") : "todos os anos, gerências e carteiras";
+  const tile = (k,l,list,h) => `<button type="button" class="sum ${k}" data-grp="${k}" aria-pressed="${same(k)}"><span class="l">${l}</span><span class="v">${list.length.toLocaleString("pt-BR")}</span><span class="pc">${pc(list.length)} do total</span><span class="h">${h}</span></button>`;
+  $("#summary").innerHTML =
+    `<div class="sum tot"><span class="l">Requisições</span><span class="v">${tot.toLocaleString("pt-BR")}</span><span class="pc">${esc(scopeTxt)}</span><span class="h">${mig?`inclui ${mig} migrada(s)/interna(s)`:"&nbsp;"}</span></div>`
+    + tile("ent","Entregues",ent,`${vag(ent)} vagas · ${fmtN(ent.reduce((a,r)=>a+(r.presente||0),0))} presentes`)
+    + tile("can","Canceladas",can,`${vag(can)} vagas canceladas`)
+    + tile("abe","Abertas",abe,`${vag(abe)} vagas · ${fmtN(abe.reduce((a,r)=>a+Math.max(0,r.necessidade-(r.presente||0)),0))} a preencher`);
+}
 function filtered(all){
-  const q = $("#q").value.trim().toLowerCase(), c=$("#fCidade").value, s=$("#fSup").value, m=$("#fMes").value;
-  return all.filter(r => (!S.status.size || S.status.has(r.status)) && (!c || r.cidade===c) && (!s || r.superintendente===s) && (!m || r.mes===m)
+  const q = $("#q").value.trim().toLowerCase(), c=$("#fCidade").value, m=$("#fMes").value;
+  return scoped(all).filter(r => (!S.status.size || S.status.has(r.status)) && (!c || r.cidade===c) && (!m || r.mes===m)
     && (!S.alertOnly || r.flags.length)
     && (!q || [r.wd,r.carteira,r.superintendente,r.cidade,r.nota,...(r.hist||[]).map(h=>h.t),...(r.candidatos||[]).map(x=>x.id)].join(" ").toLowerCase().includes(q)));
 }
@@ -390,7 +432,7 @@ function renderKPIs(all){
 }
 function renderTable(){
   const all = rows();
-  renderFilters(all); renderKPIs(all);
+  renderFilters(all); const sc = scoped(all); renderSummary(sc); renderKPIs(sc);
   const list = sortRows(filtered(all));
   $("#count").textContent = `${list.length.toLocaleString("pt-BR")} de ${all.length.toLocaleString("pt-BR")} requisições`;
   document.querySelectorAll("#tbl th").forEach(th=>th.setAttribute("aria-sort", th.dataset.k===S.sort.k ? (S.sort.dir>0?"ascending":"descending") : "none"));
@@ -694,6 +736,8 @@ document.addEventListener("click", e=>{
   const tab = e.target.closest(".tab"); if(tab){ S.tab = tab.dataset.tab; document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t===tab)); ["requisicoes","painel","carteiras","feriados"].forEach(v=>$("#v-"+v).hidden = v!==S.tab); try{localStorage.setItem("req.tab",S.tab)}catch{} renderAll(); return; }
   const chip = e.target.closest("#fStatus .chip"); if(chip){ const s=chip.dataset.s; S.status.has(s)?S.status.delete(s):S.status.add(s); S.limit=100; renderTable(); return; }
   if(e.target.closest("#fAlert")){ S.alertOnly=!S.alertOnly; $("#fAlert").setAttribute("aria-pressed",S.alertOnly); renderTable(); return; }
+  const gr = e.target.closest(".sum[data-grp]"); if(gr){ S.status = new Set(GROUPS[gr.dataset.grp]); S.alertOnly=false; $("#fAlert").setAttribute("aria-pressed",false); S.limit=100; renderTable(); return; }
+  if(e.target.closest("#btnClearScope")){ ["fAno","fSup","fCart"].forEach(i=>$("#"+i).value=""); S.limit=100; renderTable(); return; }
   const k = e.target.closest(".kpi[data-act]"); if(k){ if(k.dataset.act==="open"){ S.status=new Set(OPEN); S.alertOnly=false; } else { S.status=new Set(OPEN); S.alertOnly=true; } $("#fAlert").setAttribute("aria-pressed",S.alertOnly); renderTable(); return; }
   const th = e.target.closest("#tbl th"); if(th){ const kk=th.dataset.k; S.sort = {k:kk, dir: S.sort.k===kk ? -S.sort.dir : (["wd","carteira","cidade","status","nota"].includes(kk)?1:-1)}; renderTable(); return; }
   const tr = e.target.closest("#tb tr"); if(tr){ openReq(tr.dataset.id); return; }
@@ -709,7 +753,7 @@ document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
   if(e.key==="Enter" && e.target.matches("#tb tr, #tbc tr")) e.target.click();
 });
-["q","fCidade","fSup","fMes"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderTable(); }));
+["q","fCidade","fAno","fSup","fCart","fMes"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderTable(); }));
 ["pAno","pCidade"].forEach(id=>$("#"+id).addEventListener("change", renderPainel));
 $("#qc").addEventListener("input", renderCarteiras);
 $("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#ferData").value, n=$("#ferNome").value.trim(); if(!d||!n) return; saveFer([...S.fer.filter(f=>f.data!==d), {data:d,nome:n}]); e.target.reset(); });
