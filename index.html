@@ -1049,11 +1049,29 @@ const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrh
 const normWD = s => { const m = String(s||"").toUpperCase().match(/R\s*0*(\d{6,8})/); return m ? "R"+m[1] : ""; };
 const normH = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
 function resultText(res){ const b = (res && res.content) || []; const t = b.filter(x=>x.type==="text").map(x=>x.text).join("\n"); return t || (typeof res?.payload==="string" ? res.payload : ""); }
+const SP_AUTH = ["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"];
+SP.errLog = {};
+function spLogErr(e){ const c = (e && e.code) || "erro"; const o = SP.errLog[c] || (SP.errLog[c] = {n:0, msg:""}); o.n++; if(!o.msg) o.msg = String(e?.message||"").replace(/[\w.+-]+@[\w.-]+/g,"…").slice(0,160); }
 async function spRead(uri, startPage){
   const input = startPage ? {uri, startPage} : {uri};
-  let tries = 0;
-  for(;;){ try{ return resultText(await SP.mcp.callTool(SP.server, "read_resource", input, {cache:false})); }
-    catch(e){ if(e && e.retryable && tries<1){ tries++; await new Promise(r=>setTimeout(r, (e.retryAfterMs||1500)+Math.random()*800)); continue; } throw e; } }
+  const waits = [2000, 6000, 15000];
+  for(let tries = 0;; tries++){
+    try{ return resultText(await SP.mcp.callTool(SP.server, "read_resource", input, {cache:false})); }
+    catch(e){ if(SP_AUTH.includes(e?.code) || tries >= waits.length) throw e;
+      await new Promise(r=>setTimeout(r, Math.max(e?.retryAfterMs||0, waits[tries]) + Math.random()*1000)); }
+  }
+}
+// fila com trabalhadores que só param quando não há mais nada pendente nem em andamento
+async function pool(items, n, fn){
+  const q = [...items]; let active = 0;
+  await new Promise((resolve, reject)=>{
+    const next = () => {
+      if(!q.length && !active) return resolve();
+      while(active < n && q.length){ const it = q.shift(); active++;
+        Promise.resolve().then(()=>fn(it, x=>q.push(x))).then(()=>{ active--; next(); }, err=>{ active--; q.length = 0; reject(err); }); }
+    };
+    next();
+  });
 }
 function parseListing(text){
   const out = [], re = /([^\n]*?) \((folder|file), \d+ bytes\) file:\/\/\/([^\/\s]+)\/([A-Za-z0-9]{34})/g; let m;
@@ -1062,29 +1080,29 @@ function parseListing(text){
 }
 async function spCrawl(){
   const files = {}, unk = []; let folders = 0, failed = 0;
-  const queue = SP.roots.map(r=>({uri:`file:///${SP.drive}/${r.id}`, raso:!!r.raso}));
   const limitDate = iso(new Date(Date.now()-120*864e5));
-  const worker = async () => { while(queue.length){ const {uri, raso} = queue.shift(); folders++;
-    if(folders > 1500) return;
+  const listFolder = async ({uri, raso}, push) => { folders++;
+    if(folders > 2500) return;
     SP.prog = `Lendo pastas do SharePoint… ${folders} pastas, ${Object.keys(files).length} requisições encontradas`; renderSpBar();
     try{ let page = null, guard = 0;
       do{ const {items, next} = parseListing(await spRead(uri, page)); page = next; guard++;
-        items.forEach(it=>{ if(it.type==="folder"){ if(!raso) queue.push({uri:`file:///${it.drive}/${it.id}`, raso:false}); }
+        items.forEach(it=>{ if(it.type==="folder"){ if(!raso) push({uri:`file:///${it.drive}/${it.id}`, raso:false}); }
           else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
             if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]);
             else { const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const y = m ? (m[3].length===2 ? "20"+m[3] : m[3]) : null;
               if(!m || `${y}-${m[2]}-${m[1]}` >= limitDate) unk.push(it); } } });
       } while(page && guard < 20);
-    }catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
-  } };
-  await Promise.all([worker(),worker(),worker(),worker()]);
-  // arquivos sem número de requisição no nome (São Paulo): lê o conteúdo uma vez e guarda quais requisições estão nele
-  const scanned = {...(SP.index?.scanned||{})}; const todo = unk.filter(it=>!(it.id in scanned)); let k = 0;
-  const w2 = async () => { while(todo.length){ const it = todo.shift(); k++;
-    SP.prog = `Identificando listas de São Paulo… ${k} arquivos`; renderSpBar();
+    }catch(e){ failed++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
+  };
+  await pool(SP.roots.map(r=>({uri:`file:///${SP.drive}/${r.id}`, raso:!!r.raso})), 3, listFolder);
+  // se uma pasta falhou, mantém o que ela tinha no índice anterior
+  if(failed && SP.index?.files) Object.entries(SP.index.files).forEach(([wd,l])=>{ const cur = files[wd] = files[wd]||[]; l.forEach(f=>{ if(!cur.some(x=>x[0]===f[0])) cur.push(f); }); });
+  // arquivos sem número de requisição no nome: lê o conteúdo uma vez e guarda quais requisições estão nele
+  const scanned = {...(SP.index?.scanned||{})}; let k = 0;
+  await pool(unk.filter(it=>!(it.id in scanned)), 2, async it => { k++;
+    SP.prog = `Identificando listas sem número no nome… ${k} arquivos`; renderSpBar();
     try{ const wds = [...new Set(parseSheet(await spRead(`file:///${it.drive}/${it.id}`), "").map(x=>x.wd).filter(Boolean))]; scanned[it.id] = [wds, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]; }
-    catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; } } };
-  await Promise.all([w2(),w2(),w2()]);
+    catch(e){ failed++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; } });
   Object.entries(scanned).forEach(([id,[wds,name,drv]])=>wds.forEach(wd=>{ const l = files[wd] = files[wd]||[]; if(!l.some(f=>f[0]===id)) l.push([id,name,drv]); }));
   let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, scanned, folders, failed};
   if(JSON.stringify(doc).length > 240000){ const mine = new Set([...S.reqs.values()].map(r=>normWD(r.wd))); doc.files = Object.fromEntries(Object.entries(files).filter(([k])=>mine.has(k))); }
@@ -1135,10 +1153,10 @@ async function spSync(force){
     const l = await lock.acquire({holder: S.me || "anon", ttlMs: 300000}).catch(()=>({acquired:true}));
     if(!l.acquired){ SP.state = "ok"; SP.msg = "Outra pessoa está sincronizando agora. Os dados chegam em instantes."; return; }
     const age = SP.index?.crawledAt ? (Date.now() - Date.parse(SP.index.crawledAt))/36e5 : 99;
-    if(force || age > 6 || !SP.index) await spCrawl();
+    SP.errLog = {};
+    if(!SP.index || age > 6 || (SP.index.failed||0) > 0 || (force && age > 1)) await spCrawl();
     const targets = spTargets(); let done = 0, changed = 0, errs = 0;
-    const queue = [...targets];
-    const worker = async () => { while(queue.length){ const t = queue.shift();
+    await pool(targets, 2, async t => {
       SP.prog = `Lendo turmas no SharePoint… ${done} de ${targets.length}`; renderSpBar();
       try{
         const byId = new Map(); const names = [];
@@ -1156,12 +1174,12 @@ async function spSync(force){
           await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names}});
           changed++;
         } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
-      }catch(e){ errs++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
-      done++; } };
-    await Promise.all([worker(),worker(),worker()]);
-    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, erros:errs};
+      }catch(e){ errs++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
+      done++; });
+    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, erros:errs, pastasComFalha:SP.index?.failed||0, motivos:SP.errLog};
     await S.db.doc("sp/status").set(meta).catch(()=>{});
-    SP.state = "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas${errs?`, ${errs} arquivos não puderam ser lidos`:""}.`;
+    const mot = Object.entries(SP.errLog).sort((a,b)=>b[1].n-a[1].n)[0];
+    SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
   }catch(e){ spError(e); }
   finally{ SP.running = false; SP.prog = ""; renderSpBar(); }
 }
