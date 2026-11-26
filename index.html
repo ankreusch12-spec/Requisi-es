@@ -601,7 +601,7 @@ function openReq(id){
     F("wdErr").textContent = dup ? "Já existe outra requisição ativa com este número." : "";
   };
   const renderCands = () => {
-    F("cands").innerHTML = cands.map((c,i)=>`<div class="cand"><span class="mono">${esc(c.id)}</span>
+    F("cands").innerHTML = cands.map((c,i)=>`<div class="cand"><span class="mono">${c.id.startsWith("n")?`<span class="hint">sem ID Workday · ${esc(c.id.slice(1,6))}</span>`:esc(c.id)}</span>
       <span class="seg"><button type="button" class="p" data-ci="${i}" data-s="PRESENTE" aria-pressed="${c.s==="PRESENTE"}" ${ro?"disabled":""}>Presente</button><button type="button" class="n" data-ci="${i}" data-s="NO SHOW" aria-pressed="${c.s==="NO SHOW"}" ${ro?"disabled":""}>No show</button></span>${c.s==="PENDENTE"?`<span class="hint">sem presença</span>`:""}
       ${ro?"":`<button type="button" class="btn sm ghost" data-rm="${i}" aria-label="Remover ${esc(c.id)}">✕</button>`}</div>`).join("");
     recalc();
@@ -767,7 +767,12 @@ $("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#fe
 
 /* ---------- SharePoint (Microsoft 365) ---------- */
 const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrhdv7WpHnGztjhRK6kSuTrXlRyj_aiJA",
-  roots:["ADMISSÃO E TREINAMENTO/CURITIBA"], mcp:null, state:"off", msg:"", index:null, meta:null, running:false, prog:"" };
+  roots:[
+    {nome:"Curitiba", id:"01ZYDITNQ52GUQRXBBNJHYXE6HJ4QMM6XU"},
+    {nome:"Ponta Grossa", id:"01ZYDITNS4CK4IHNQNABAZE2Y4SW2HRUS4"},
+    {nome:"São Paulo · Claro + Net", id:"01ZYDITNVWW6QVTAEFYBH32KB3KOHG5W57"},
+    {nome:"São Paulo · Smiles", id:"01ZYDITNWQVCIAY7KK3JBYJP3LZIVOZHD5"},
+  ], mcp:null, state:"off", msg:"", index:null, meta:null, running:false, prog:"" };
 const normWD = s => { const m = String(s||"").toUpperCase().match(/R\s*0*(\d{6,8})/); return m ? "R"+m[1] : ""; };
 const normH = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
 function resultText(res){ const b = (res && res.content) || []; const t = b.filter(x=>x.type==="text").map(x=>x.text).join("\n"); return t || (typeof res?.payload==="string" ? res.payload : ""); }
@@ -783,38 +788,57 @@ function parseListing(text){
   const next = text.match(/startPage=(\d+)/); return {items:out, next: next ? +next[1] : null};
 }
 async function spCrawl(){
-  const files = {}; let folders = 0, failed = 0;
-  const queue = SP.roots.map(p=>`file:///${SP.drive}/${p}`);
+  const files = {}, unk = []; let folders = 0, failed = 0;
+  const queue = SP.roots.map(r=>`file:///${SP.drive}/${r.id}`);
+  const limitDate = iso(new Date(Date.now()-120*864e5));
   const worker = async () => { while(queue.length){ const uri = queue.shift(); folders++;
-    if(folders > 800) return;
+    if(folders > 1500) return;
     SP.prog = `Lendo pastas do SharePoint… ${folders} pastas, ${Object.keys(files).length} requisições encontradas`; renderSpBar();
     try{ let page = null, guard = 0;
       do{ const {items, next} = parseListing(await spRead(uri, page)); page = next; guard++;
         items.forEach(it=>{ if(it.type==="folder") queue.push(`file:///${it.drive}/${it.id}`);
-          else if(/\.xlsx?$/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]); if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]); } });
+          else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
+            if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]);
+            else { const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const y = m ? (m[3].length===2 ? "20"+m[3] : m[3]) : null;
+              if(m && `${y}-${m[2]}-${m[1]}` >= limitDate) unk.push(it); } } });
       } while(page && guard < 20);
     }catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
   } };
   await Promise.all([worker(),worker(),worker(),worker()]);
-  let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, folders, failed};
+  // arquivos sem número de requisição no nome (São Paulo): lê o conteúdo uma vez e guarda quais requisições estão nele
+  const scanned = {...(SP.index?.scanned||{})}; const todo = unk.filter(it=>!(it.id in scanned)); let k = 0;
+  const w2 = async () => { while(todo.length){ const it = todo.shift(); k++;
+    SP.prog = `Identificando listas de São Paulo… ${k} arquivos`; renderSpBar();
+    try{ const wds = [...new Set(parseSheet(await spRead(`file:///${it.drive}/${it.id}`), "").map(x=>x.wd).filter(Boolean))]; scanned[it.id] = [wds, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]; }
+    catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; } } };
+  await Promise.all([w2(),w2(),w2()]);
+  Object.entries(scanned).forEach(([id,[wds,name,drv]])=>wds.forEach(wd=>{ const l = files[wd] = files[wd]||[]; if(!l.some(f=>f[0]===id)) l.push([id,name,drv]); }));
+  let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, scanned, folders, failed};
   if(JSON.stringify(doc).length > 240000){ const mine = new Set([...S.reqs.values()].map(r=>normWD(r.wd))); doc.files = Object.fromEntries(Object.entries(files).filter(([k])=>mine.has(k))); }
   await S.db.doc("sp/index").set(doc);
   SP.index = doc; return doc;
 }
+function hashKey(str){ let h = 0x811c9dc5; for(const ch of str){ h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); }
 function parseSheet(text, fileWD){
   const rows = []; let cols = null;
   for(const line of text.split("\n")){
     if(/^## /.test(line) || /^Formulas/i.test(line)){ cols = null; continue; }
     const cells = line.split("\t");
-    if(!cols){ const H = cells.map(normH); const iReq = H.indexOf("REQ"), iId = H.indexOf("ID"), iP = H.findIndex(h=>h.startsWith("PRESEN"));
-      if(iId>=0 && iP>=0) cols = {req:iReq, id:iId, p:iP, fin:H.findIndex(h=>h.startsWith("STATUS FINAL")), des:H.findIndex(h=>h.includes("DESISTENTE"))};
+    if(!cols){ const H = cells.map(normH);
+      const c = {req:H.indexOf("REQ"), id:H.indexOf("ID"), mat:H.findIndex(h=>h.startsWith("MATRICULA")), nome:H.findIndex(h=>h.startsWith("NOME DE REGISTRO")),
+        p:H.findIndex(h=>h.startsWith("PRESEN")), fin:H.findIndex(h=>h.startsWith("STATUS FINAL")), des:H.findIndex(h=>h.includes("DESISTENTE"))};
+      if(c.p>=0 && (c.id>=0 || c.mat>=0 || c.nome>=0)) cols = c;
       continue; }
-    const id = (cells[cols.id]||"").trim(); if(!/^\d{5,}$/.test(id)) continue;
-    const p = normH(cells[cols.p]), fin = cols.fin>=0 ? normH(cells[cols.fin]) : "", des = cols.des>=0 ? normH(cells[cols.des]) : "";
+    const get = i => i>=0 ? (cells[i]||"").trim() : "";
+    const wd = normWD(get(cols.req)) || fileWD;
+    let id = get(cols.id); if(!/^\d{5,}$/.test(id)) id = get(cols.mat);
+    if(!/^\d{4,}$/.test(id)){ const nm = normH(get(cols.nome)); id = nm.length >= 5 ? "n" + hashKey(nm + "|" + wd) : ""; }
+    if(!id) continue;
+    const p = normH(get(cols.p)), fin = normH(get(cols.fin)), des = normH(get(cols.des));
     let s = "PENDENTE";
-    if(/NO ?SHOW|DESIST|FALT/.test(p) || /DESIST/.test(fin) || (des && !/^(NAO|N|-)$/.test(des))) s = "NO SHOW";
-    else if(/PRESENT/.test(p)) s = "PRESENTE";
-    rows.push({wd: normWD(cells[cols.req]) || fileWD, id, s, ...(fin ? {fin: fin.slice(0,40)} : {})});
+    if(/NO.?SHOW|DESIST|FALT/.test(p) || /DESIST/.test(fin) || (des && !/^(NAO|N|-|--)$/.test(des))) s = "NO SHOW";
+    else if(/PRESEN/.test(p)) s = "PRESENTE";
+    rows.push({wd, id, s, ...(fin ? {fin: fin.slice(0,40)} : {})});
   }
   return rows;
 }
@@ -881,7 +905,7 @@ function renderSpBar(){
   const when = SP.meta?.at ? new Date(SP.meta.at) : null;
   const ago = when ? Math.round((Date.now()-when)/6e4) : null;
   const agoTxt = ago==null ? "ainda não sincronizado" : ago < 1 ? "agora" : ago < 60 ? `há ${ago} min` : ago < 1440 ? `há ${Math.round(ago/60)} h` : `em ${br(SP.meta.at.slice(0,10))}`;
-  el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b><span class="sub">${
+  el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b> <span class="hint">Curitiba, Ponta Grossa e São Paulo (Claro + Net, Smiles)</span><span class="sub">${
     SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Presentes e no show das turmas, atualizados ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
     SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
     : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync">Sincronizar agora</button>` : ""}</div>`;
