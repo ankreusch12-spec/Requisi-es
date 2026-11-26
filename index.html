@@ -1044,6 +1044,7 @@ const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrh
     {nome:"Ponta Grossa", id:"01ZYDITNS4CK4IHNQNABAZE2Y4SW2HRUS4"},
     {nome:"São Paulo · Claro + Net", id:"01ZYDITNVWW6QVTAEFYBH32KB3KOHG5W57"},
     {nome:"São Paulo · Smiles", id:"01ZYDITNWQVCIAY7KK3JBYJP3LZIVOZHD5"},
+    {nome:"São Paulo (arquivos soltos na pasta)", id:"01ZYDITNUVVRHHC3ABDBE2RNFZ3XTWZQCI", raso:true},
   ], mcp:null, state:"off", msg:"", index:null, meta:null, running:false, prog:"" };
 const normWD = s => { const m = String(s||"").toUpperCase().match(/R\s*0*(\d{6,8})/); return m ? "R"+m[1] : ""; };
 const normH = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
@@ -1061,18 +1062,18 @@ function parseListing(text){
 }
 async function spCrawl(){
   const files = {}, unk = []; let folders = 0, failed = 0;
-  const queue = SP.roots.map(r=>`file:///${SP.drive}/${r.id}`);
+  const queue = SP.roots.map(r=>({uri:`file:///${SP.drive}/${r.id}`, raso:!!r.raso}));
   const limitDate = iso(new Date(Date.now()-120*864e5));
-  const worker = async () => { while(queue.length){ const uri = queue.shift(); folders++;
+  const worker = async () => { while(queue.length){ const {uri, raso} = queue.shift(); folders++;
     if(folders > 1500) return;
     SP.prog = `Lendo pastas do SharePoint… ${folders} pastas, ${Object.keys(files).length} requisições encontradas`; renderSpBar();
     try{ let page = null, guard = 0;
       do{ const {items, next} = parseListing(await spRead(uri, page)); page = next; guard++;
-        items.forEach(it=>{ if(it.type==="folder") queue.push(`file:///${it.drive}/${it.id}`);
+        items.forEach(it=>{ if(it.type==="folder"){ if(!raso) queue.push({uri:`file:///${it.drive}/${it.id}`, raso:false}); }
           else if(/\.xlsx?$/i.test(it.name) && !/MODELO|BASE PLANILHA/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]);
             if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]);
             else { const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const y = m ? (m[3].length===2 ? "20"+m[3] : m[3]) : null;
-              if(m && `${y}-${m[2]}-${m[1]}` >= limitDate) unk.push(it); } } });
+              if(!m || `${y}-${m[2]}-${m[1]}` >= limitDate) unk.push(it); } } });
       } while(page && guard < 20);
     }catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
   } };
