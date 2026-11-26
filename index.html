@@ -4,42 +4,52 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: barra de ferramentas fixa → faixa de indicadores → filtros → tabela densa; formulário abre em painel lateral. */
+/* Layout: barra azul-marinho fixa com abas → filtros de escopo e resumo → grade editável no formato da planilha. Cores: paleta Concentrix (marinho, verde-água, limão, laranja). */
 :root{
-  --bg:#f3f5f6; --surface:#ffffff; --surface-2:#eaeef0; --line:#d6dde1; --line-strong:#b9c4ca;
-  --fg:#14201f; --fg-2:#4d5b5e; --fg-3:#76858a;
-  --accent:#0b6b62; --accent-fg:#ffffff; --accent-soft:#d9efec;
-  --ok:#1a7f37; --ok-soft:#dcf2e1; --warn:#a15c00; --warn-soft:#fbecd2; --bad:#b42318; --bad-soft:#fbe1de;
-  --info:#1d5fb8; --info-soft:#dde9fa; --violet:#5b3fc4; --violet-soft:#e8e2fb; --mute-soft:#e6e9eb;
-  --s1:#257de0; --s2:#f47230;
+  --brand:#09347A; --brand-2:#072a63; --brand-ink:#ffffff; --brand-ink-2:rgba(255,255,255,.72); --lime:#C0D62E; --orange:#FF6325; --teal:#00929F;
+  --bg:#f3f6fb; --surface:#ffffff; --surface-2:#e9eff8; --line:#d5deeb; --line-strong:#b3c1d6;
+  --fg:#0a1d40; --fg-2:#44546f; --fg-3:#6b7a93;
+  --accent:#007f8a; --accent-fg:#ffffff; --accent-soft:#d5eff1;
+  --ok:#1a7f37; --ok-soft:#dcf2e1; --warn:#b4470f; --warn-soft:#ffe7db; --bad:#b42318; --bad-soft:#fbe1de;
+  --info:#09347A; --info-soft:#dde7f7; --violet:#5b3fc4; --violet-soft:#e8e2fb; --mute-soft:#e6eaf0;
+  --s1:#09347A; --s2:#00929F;
   --f-display:"Archivo",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
-  --r:6px; --shadow:0 10px 40px rgba(10,30,30,.18);
+  --r:6px; --shadow:0 10px 40px rgba(9,52,122,.18);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f1516; --surface:#161e20; --surface-2:#1e282a; --line:#2a3538; --line-strong:#3b494c;
-  --fg:#e5ecec; --fg-2:#a6b4b6; --fg-3:#7b8a8d;
-  --accent:#3fb6a8; --accent-fg:#06201d; --accent-soft:#173a36;
-  --ok:#4cc26c; --ok-soft:#173523; --warn:#e3a13f; --warn-soft:#3a2a12; --bad:#f07068; --bad-soft:#3d1c1a;
-  --info:#6ea6f0; --info-soft:#1a2b45; --violet:#a594f2; --violet-soft:#2a2346; --mute-soft:#252f31;
-  --s1:#338ced; --s2:#e76624; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}}
+  --brand:#0a2b63; --brand-2:#06204d; --brand-ink:#ffffff; --brand-ink-2:rgba(255,255,255,.7);
+  --bg:#071328; --surface:#0d1e3d; --surface-2:#142a50; --line:#203a66; --line-strong:#33507f;
+  --fg:#e7eefb; --fg-2:#a9b7cf; --fg-3:#7d8eab;
+  --accent:#2bb8c4; --accent-fg:#04232a; --accent-soft:#103d4a;
+  --ok:#4cc26c; --ok-soft:#133423; --warn:#ff8a57; --warn-soft:#3d2416; --bad:#f07068; --bad-soft:#3d1c1a;
+  --info:#8fb3f5; --info-soft:#17305c; --violet:#a594f2; --violet-soft:#2a2346; --mute-soft:#1c2c4a;
+  --s1:#7ea6f2; --s2:#2bb8c4; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f1516; --surface:#161e20; --surface-2:#1e282a; --line:#2a3538; --line-strong:#3b494c;
-  --fg:#e5ecec; --fg-2:#a6b4b6; --fg-3:#7b8a8d;
-  --accent:#3fb6a8; --accent-fg:#06201d; --accent-soft:#173a36;
-  --ok:#4cc26c; --ok-soft:#173523; --warn:#e3a13f; --warn-soft:#3a2a12; --bad:#f07068; --bad-soft:#3d1c1a;
-  --info:#6ea6f0; --info-soft:#1a2b45; --violet:#a594f2; --violet-soft:#2a2346; --mute-soft:#252f31;
-  --s1:#338ced; --s2:#e76624; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}
+  --brand:#0a2b63; --brand-2:#06204d; --brand-ink:#ffffff; --brand-ink-2:rgba(255,255,255,.7);
+  --bg:#071328; --surface:#0d1e3d; --surface-2:#142a50; --line:#203a66; --line-strong:#33507f;
+  --fg:#e7eefb; --fg-2:#a9b7cf; --fg-3:#7d8eab;
+  --accent:#2bb8c4; --accent-fg:#04232a; --accent-soft:#103d4a;
+  --ok:#4cc26c; --ok-soft:#133423; --warn:#ff8a57; --warn-soft:#3d2416; --bad:#f07068; --bad-soft:#3d1c1a;
+  --info:#8fb3f5; --info-soft:#17305c; --violet:#a594f2; --violet-soft:#2a2346; --mute-soft:#1c2c4a;
+  --s1:#7ea6f2; --s2:#2bb8c4; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--brand)}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1600px;margin:0 auto}
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--brand);color:var(--brand-ink);border-bottom:3px solid var(--lime)}
+header.top .btn{background:transparent;border-color:rgba(255,255,255,.35);color:var(--brand-ink)}
+header.top .btn:hover{background:rgba(255,255,255,.1)}
+header.top .btn.primary{background:var(--lime);border-color:var(--lime);color:#09347A;font-weight:600}
+header.top .btn.primary:hover{filter:brightness(1.05);background:var(--lime)}
+header.top :focus-visible{outline-color:var(--lime)}
 .top .wrap{display:flex;align-items:center;gap:12px;padding-block:10px;flex-wrap:wrap}
 .brand{display:flex;flex-direction:column;min-width:0;margin-right:auto}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:18px;margin:0;letter-spacing:-.01em;text-wrap:balance}
-.brand small{color:var(--fg-3);font-size:12px}
-.sync{font-size:12px;color:var(--fg-3);display:flex;align-items:center;gap:6px}
+.brand small{color:var(--brand-ink-2);font-size:12px}
+.brand h1 .mark{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--lime);margin-right:8px;vertical-align:1px}
+.sync{font-size:12px;color:var(--brand-ink-2);display:flex;align-items:center;gap:6px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--fg-3)}
 .dot.on{background:var(--ok)} .dot.err{background:var(--bad)}
 .btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);padding:7px 12px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -52,8 +62,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .btn:disabled{opacity:.5;cursor:not-allowed}
 nav.tabs{display:flex;gap:2px;overflow-x:auto}
 nav.tabs .wrap{display:flex;gap:4px;padding-block:0}
-.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;cursor:pointer;color:var(--fg-2);font-weight:500;white-space:nowrap}
-.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+.tab{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-3px;padding:10px 12px;cursor:pointer;color:var(--brand-ink-2);font-weight:500;white-space:nowrap}
+.tab:hover{color:var(--brand-ink)}
+.tab[aria-selected="true"]{color:var(--brand-ink);border-bottom-color:var(--lime);font-weight:600}
 main{padding-block:16px 48px}
 .notice{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .notice.warn{border-color:var(--warn);background:var(--warn-soft)}
@@ -119,6 +130,34 @@ td.note span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertica
 .bar i{display:block;height:100%;background:var(--accent)}
 .bar i.full{background:var(--ok)}
 .fill b{font-size:12px;font-weight:500;color:var(--fg-2);min-width:34px;text-align:right}
+.grid th{position:static;white-space:normal;min-width:64px;line-height:1.2;vertical-align:bottom;background:var(--surface-2);color:var(--fg-2)}
+.grid td{padding:2px 3px;white-space:nowrap}
+.grid tbody tr{cursor:default}
+.grid tbody tr:hover{background:transparent}
+.grid tbody tr:hover td{background:color-mix(in srgb, var(--surface-2) 55%, transparent)}
+.grid tr.pin td{background:var(--accent-soft)}
+.grid input,.grid select{border:1px solid transparent;background:transparent;border-radius:4px;padding:5px 6px;width:100%;min-width:0;font-size:13px}
+.grid input:hover,.grid select:hover{border-color:var(--line)}
+.grid input:focus,.grid select:focus{border-color:var(--accent);background:var(--surface);outline:none;box-shadow:0 0 0 2px var(--accent-soft)}
+.grid input[readonly]{color:var(--fg-2)}
+.grid input[type=number]{text-align:right;-moz-appearance:textfield}
+.grid input[type=number]::-webkit-inner-spin-button,.grid input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.grid input[type=date]{font-variant-numeric:tabular-nums;width:132px}
+.grid td.ro{padding:5px 9px;color:var(--fg-2);font-variant-numeric:tabular-nums}
+.grid td.ro.n{text-align:right}
+.grid td.tot{font-weight:700;color:var(--fg)}
+.grid .w-g{width:120px}.grid .w-wd{width:104px}.grid .w-st{width:142px}.grid .w-nt{width:280px}.grid .w-ci{width:128px}.grid .w-ca{width:230px}.grid .w-n{width:72px}
+.grid select.stsel{font-weight:600;font-size:12px}
+.grid select.st-ABERTO{color:var(--info)}.grid select.st-EDITADA{color:var(--warn)}.grid select.st-COMPLEMENTAR{color:var(--accent)}.grid select.st-ENTREGUE{color:var(--ok)}.grid select.st-FECHADA{color:var(--fg-2)}.grid select.st-CANCELADA{color:var(--bad)}.grid select.st-MIGRADO{color:var(--violet)}
+.fl{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700}
+.fl.b{background:var(--bad-soft);color:var(--bad)} .fl.w{background:var(--warn-soft);color:var(--warn)}
+.rowmore{border:0;background:transparent;cursor:pointer;color:var(--fg-3);border-radius:4px;padding:4px 7px;font-size:15px;line-height:1}
+.rowmore:hover{background:var(--surface-2);color:var(--fg)}
+.saved{animation:flash .9s ease-out}
+@keyframes flash{from{background:var(--accent-soft)}to{background:transparent}}
+.gridhint{font-size:12px;color:var(--fg-3);margin:6px 2px 0}
+.grp td{background:var(--surface-2);font-weight:700;color:var(--fg);font-size:12.5px}
+.grp td.n{text-align:right}
 .empty{padding:40px 16px;text-align:center;color:var(--fg-2)}
 .empty h3{font-family:var(--f-display);margin:0 0 6px;color:var(--fg)}
 .more{display:flex;justify-content:center;padding:10px}
@@ -179,7 +218,7 @@ label.f input,label.f select{width:100%}
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <h1>Acompanhamento de Requisições</h1>
+      <h1><span class="mark" aria-hidden="true"></span>Acompanhamento de Requisições</h1>
       <small id="subtitle">Requisições Workday · vagas, treinamento e ALO</small>
     </div>
     <div class="sync" id="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Conectando…</span></div>
@@ -188,9 +227,10 @@ label.f input,label.f select{width:100%}
   </div>
   <nav class="tabs" aria-label="Seções"><div class="wrap" role="tablist">
     <button class="tab" role="tab" data-tab="requisicoes" aria-selected="true">Requisições</button>
+    <button class="tab" role="tab" data-tab="entregues" aria-selected="false">Vagas entregues</button>
     <button class="tab" role="tab" data-tab="painel" aria-selected="false">Painel</button>
     <button class="tab" role="tab" data-tab="carteiras" aria-selected="false">Carteiras (DE-PARA)</button>
-    <button class="tab" role="tab" data-tab="feriados" aria-selected="false">Feriados</button>
+    
   </div></nav>
 </header>
 
@@ -198,7 +238,7 @@ label.f input,label.f select{width:100%}
   <div id="banner"></div>
   <div id="spbar"></div>
 
-  <section id="v-requisicoes">
+  <div id="scopeBox">
     <div class="scope">
       <label class="f">Ano de abertura<select id="fAno"><option value="">Todos os anos</option></select></label>
       <label class="f">Gerência<select id="fSup"><option value="">Todas as gerências</option></select></label>
@@ -206,6 +246,9 @@ label.f input,label.f select{width:100%}
       <button class="btn ghost sm" type="button" id="btnClearScope" hidden>Limpar filtros</button>
     </div>
     <div class="summary" id="summary"></div>
+  </div>
+
+  <section id="v-requisicoes">
     <div class="kpis" id="kpis"></div>
     <div class="filters">
       <input type="search" id="q" placeholder="Buscar requisição, carteira, acompanhamento…" aria-label="Buscar">
@@ -217,19 +260,14 @@ label.f input,label.f select{width:100%}
       <button class="chip" id="fAlert" aria-pressed="false" type="button">⚠ Só com alerta</button>
       <span class="count" id="count"></span>
     </div>
-    <div class="tablebox"><table id="tbl">
-      <thead><tr>
-        <th data-k="wd">Workday</th><th data-k="status">Status</th><th data-k="carteira">Carteira</th><th data-k="cidade">Cidade</th>
-        <th class="n" data-k="necessidade">Necess.</th><th class="n" data-k="buffer">Buffer</th><th class="n" data-k="total">Total</th>
-        <th class="n" data-k="selecionados">Selec.</th><th class="n" data-k="noShow">No show</th><th class="n" data-k="presente">Pres.</th>
-        <th data-k="pct">Preench.</th><th data-k="abertura">Abertura</th><th data-k="inicioTreino">Início trein.</th><th data-k="alo">ALO</th>
-        <th data-k="nota">Último acompanhamento</th>
-      </tr></thead>
+    <div class="tablebox"><table id="tbl" class="grid">
+      <thead><tr id="gridHead"></tr></thead>
       <tbody id="tb"></tbody>
     </table>
     <div id="tblEmpty"></div>
     <div class="more" id="more" hidden><button class="btn" id="btnMore" type="button">Mostrar mais</button></div>
     </div>
+    <p class="gridhint">Clique numa célula para editar; a alteração é salva ao sair da célula. Total, ano e mês são calculados. ⋯ abre o histórico e a lista de candidatos.</p>
   </section>
 
   <section id="v-painel" hidden>
@@ -261,31 +299,17 @@ label.f input,label.f select{width:100%}
     </table></div>
   </section>
 
-  <section id="v-feriados" hidden>
-    <div class="cols2">
-      <div class="card">
-        <h3>Feriados considerados no ALO</h3>
-        <p class="cap">O ALO conta dias úteis de segunda a sábado a partir do início do treinamento e pula estas datas.</p>
-        <form id="ferForm" class="inline write" style="margin-bottom:12px;flex-wrap:wrap">
-          <input type="date" id="ferData" required aria-label="Data do feriado">
-          <input type="text" id="ferNome" placeholder="Nome do feriado" required aria-label="Nome do feriado">
-          <button class="btn primary" type="submit">Adicionar</button>
-        </form>
-        <div class="tablebox"><table><tbody id="tbf"></tbody></table></div>
-      </div>
-      <div class="card">
-        <h3>Regras de cálculo</h3>
-        <p class="cap">As mesmas da planilha, com feriados.</p>
-        <div class="ctx">
-          <b>Buffer</b><span>50% da necessidade (ajustável por requisição)</span>
-          <b>Total</b><span>Necessidade + buffer</span>
-          <b>Presente</b><span>Selecionados − no show (ou contagem da lista de candidatos)</span>
-          <b>ALO</b><span>Início do treinamento + dias de treinamento, segunda a sábado, sem feriados</span>
-          <b>Início sugerido</b><span>Hoje + 21 dias úteis (seg–sex); se cair no dia 25 ou depois, usa o dia 24 do mês</span>
-          <b>Alertas</b><span>ALO vencido sem completar a necessidade · treinamento em até 7 dias sem total selecionado · sem acompanhamento há 7 dias · Workday duplicado</span>
-        </div>
-      </div>
+  <section id="v-entregues" hidden>
+    <div class="kpis" id="entKpis"></div>
+    <div class="filters">
+      <select id="eCidade" aria-label="Cidade"><option value="">Todas as cidades</option></select>
+      <label class="inline" style="font-size:13px"><input type="checkbox" id="eOpen"> Incluir requisições em andamento que já têm presentes</label>
+      <span class="count" id="countE"></span>
     </div>
+    <div class="tablebox"><table id="tblE">
+      <thead><tr><th>Workday</th><th>Gerente</th><th>Carteira</th><th>Cidade</th><th class="n">Necessidade</th><th class="n">Selecionados</th><th class="n">Entregues</th><th class="n">No show / desist.</th><th>Atingimento</th><th>Início trein.</th><th>ALO</th><th>Fonte</th></tr></thead>
+      <tbody id="tbe"></tbody>
+    </table></div>
   </section>
 </main>
 
@@ -353,7 +377,7 @@ function derive(r){
   if(S.dupes.has((r.wd||"").toUpperCase())) flags.push(["WD duplicado","w"]);
   return {...r, necessidade:nec, buffer:buf, total, selecionados:sel, noShow:ns, presente:pr, alo,
     pct: nec ? Math.min(1,(pr||0)/nec) : 0, nota: lastNote ? lastNote.t : "", lastDate, flags,
-    mes: alo ? alo.slice(0,7) : "", ano: alo ? alo.slice(0,4) : "", anoAb: (r.abertura||r.inicioTreino||alo||"").slice(0,4)};
+    mes: alo ? alo.slice(0,7) : "", ano: alo ? alo.slice(0,4) : "", anoIni: (r.inicioTreino||"").slice(0,4), mesTxt: alo ? MESES[+alo.slice(5,7)-1] : "", anoAb: (r.abertura||r.inicioTreino||alo||"").slice(0,4)};
 }
 S.dupes = new Set();
 function rows(){
@@ -434,26 +458,132 @@ function renderKPIs(all){
     ["Entregues no mês", ent, `ALO em ${mesLabel(ym)}`, null],
   ].map(([l,v,h,act,isAlert])=>`<${act?'button type="button"':'div'} class="kpi ${act?'click':''} ${isAlert?'alert':''}" ${act?`data-act="${act}"`:""}><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></${act?'button':'div'}>`).join("");
 }
+const GCOLS = [
+  {k:"flag", l:"", ro:true},
+  {k:"superintendente", l:"Gerente", t:"text", list:"dlSup", c:"w-g"},
+  {k:"wd", l:"Workday", t:"text", c:"w-wd mono"},
+  {k:"status", l:"Status", t:"status", c:"w-st"},
+  {k:"nota", l:"Justificativa / acompanhamento", t:"text", c:"w-nt"},
+  {k:"cidade", l:"Cidade", t:"cidade", c:"w-ci"},
+  {k:"carteira", l:"Carteira", t:"text", list:"dlCarteiras", c:"w-ca"},
+  {k:"necessidade", l:"Necessi&shy;dade", t:"num", c:"w-n"},
+  {k:"buffer", l:"Buffer", t:"num", c:"w-n"},
+  {k:"total", l:"Total c/ buffer", ro:true, n:true, tot:true},
+  {k:"selecionados", l:"Selecio&shy;nados", t:"num", c:"w-n", list2:true},
+  {k:"noShow", l:"No show", t:"num", c:"w-n", list2:true},
+  {k:"presente", l:"Presente", t:"num", c:"w-n", list2:true},
+  {k:"abertura", l:"Dia abertura", t:"date"},
+  {k:"inicioTreino", l:"Início treinamento", t:"date"},
+  {k:"alo", l:"ALO", t:"date"},
+  {k:"diasTreino", l:"Dias de trein.", t:"num", c:"w-n"},
+  {k:"anoIni", l:"Ano", ro:true},
+  {k:"mesTxt", l:"Mês ALO", ro:true},
+  {k:"act", l:"", ro:true},
+];
+S.pinned = new Set();
+function cellHTML(col, r){
+  const ro = !S.canWrite;
+  if(col.k==="flag"){ if(!r.flags.length) return `<td class="ro"></td>`; const bad = r.flags.some(f=>f[1]===""); return `<td class="ro" title="${esc(r.flags.map(f=>f[0]).join(" · "))}"><span class="fl ${bad?"b":"w"}">!</span></td>`; }
+  if(col.k==="act") return `<td class="ro" style="padding:2px"><button type="button" class="rowmore" title="Histórico, candidatos e mais" aria-label="Detalhes de ${esc(r.wd)}">⋯</button></td>`;
+  if(col.ro){ const v = r[col.k]; return `<td class="ro ${col.n?"n":""} ${col.tot?"tot":""}" data-ro="${col.k}">${esc(col.n ? fmtN(v) : (v||"—"))}</td>`; }
+  const v = r[col.k]; const val = v==null ? "" : v;
+  const lockList = col.list2 && (r.candidatos||[]).length;
+  const dis = ro ? (col.t==="status"||col.t==="cidade" ? "disabled" : "readonly") : "";
+  if(col.t==="status") return `<td><select data-f="status" class="stsel ${stCls(r.status)} ${col.c||""}" ${dis} aria-label="Status">${STATUSES.map(x=>`<option ${x===r.status?"selected":""}>${x}</option>`).join("")}</select></td>`;
+  if(col.t==="cidade") return `<td><select data-f="cidade" class="${col.c||""}" ${dis} aria-label="Cidade"><option value=""></option>${[...new Set([...CITIES, r.cidade].filter(Boolean))].map(x=>`<option ${x===r.cidade?"selected":""}>${esc(x)}</option>`).join("")}</select></td>`;
+  const type = col.t==="num" ? "number" : col.t==="date" ? "date" : "text";
+  const title = lockList ? ` title="Contado da lista de candidatos${r.sp?" (SharePoint)":""}"` : col.k==="nota" && val ? ` title="${esc(val)}"` : col.k==="alo" && !r.aloManual ? ` title="Calculado: início + dias de treinamento. Digite uma data para fixar."` : "";
+  return `<td><input data-f="${col.k}" type="${type}" class="${col.c||""}" value="${esc(val)}" ${col.list?`list="${col.list}"`:""} ${type==="number"?'min="0" step="1" inputmode="numeric"':""} ${dis || (lockList?"readonly":"")} aria-label="${esc(col.l.replace(/&shy;/g,""))}"${title}></td>`;
+}
+function rowHTML(r){ return `<tr data-id="${esc(r._id)}" class="${S.pinned.has(r._id)?"pin":""}">${GCOLS.map(c=>cellHTML(c,r)).join("")}</tr>`; }
 function renderTable(){
   const all = rows();
   renderFilters(all); const sc = scoped(all); renderSummary(sc); renderKPIs(sc);
-  const list = sortRows(filtered(all));
+  const pinned = all.filter(r=>S.pinned.has(r._id));
+  const list = sortRows(filtered(all).filter(r=>!S.pinned.has(r._id)));
   $("#count").textContent = `${list.length.toLocaleString("pt-BR")} de ${all.length.toLocaleString("pt-BR")} requisições`;
-  document.querySelectorAll("#tbl th").forEach(th=>th.setAttribute("aria-sort", th.dataset.k===S.sort.k ? (S.sort.dir>0?"ascending":"descending") : "none"));
-  $("#tb").innerHTML = list.slice(0,S.limit).map(r=>`<tr data-id="${esc(r._id)}" tabindex="0">
-    <td><span class="mono">${esc(r.wd)}</span>${r.flags.length?`<div class="flags">${r.flags.map(f=>`<span class="flag ${f[1]}">${esc(f[0])}</span>`).join("")}</div>`:""}</td>
-    <td>${pill(r.status)}</td>
-    <td>${esc(r.carteira)}<span class="sub">${esc(r.superintendente||"")}</span></td>
-    <td>${esc(r.cidade)}</td>
-    <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.buffer)}</td><td class="n"><b>${fmtN(r.total)}</b></td>
-    <td class="n">${fmtN(r.selecionados)}</td><td class="n">${fmtN(r.noShow)}</td><td class="n">${fmtN(r.presente)}</td>
-    <td><div class="fill"><div class="bar"><i class="${r.pct>=1?'full':''}" style="width:${Math.round(r.pct*100)}%"></i></div><b>${Math.round(r.pct*100)}%</b></div></td>
-    <td>${br(r.abertura)}</td><td>${br(r.inicioTreino)}</td><td><b>${br(r.alo)}</b></td>
-    <td class="note"><span>${esc(r.nota||"—")}</span></td></tr>`).join("");
+  if(!$("#gridHead").children.length) $("#gridHead").innerHTML = GCOLS.map(c=>c.k==="flag"||c.k==="act" ? `<th style="cursor:default;min-width:0"></th>` : `<th data-k="${c.k}" class="${c.n||c.t==="num"?"n":""}">${c.l}</th>`).join("");
+  document.querySelectorAll("#tbl th[data-k]").forEach(th=>th.setAttribute("aria-sort", th.dataset.k===S.sort.k ? (S.sort.dir>0?"ascending":"descending") : "none"));
+  $("#tb").innerHTML = [...pinned, ...list.slice(0,S.limit)].map(rowHTML).join("");
   $("#more").hidden = list.length <= S.limit;
-  $("#tblEmpty").innerHTML = list.length ? "" : (all.length
+  $("#tblEmpty").innerHTML = (list.length || pinned.length) ? "" : (all.length
     ? `<div class="empty"><h3>Nenhuma requisição com esses filtros</h3><p>Ajuste a busca ou marque outros status.</p></div>`
     : `<div class="empty"><h3>Nenhuma requisição cadastrada ainda</h3><p>As requisições aparecem aqui assim que forem carregadas.${S.canWrite?" Use <b>Nova requisição</b> ou importe o histórico da planilha.":""}</p></div>`);
+}
+function refreshRow(tr){
+  const id = tr.dataset.id, raw = S.reqs.get(id); if(!raw) return;
+  rows(); const d = {...derive(raw), _id:id};
+  tr.querySelectorAll("[data-f]").forEach(el=>{ if(el===document.activeElement) return; const v = d[el.dataset.f]; el.value = v==null ? "" : v; if(el.dataset.f==="status") el.className = `stsel ${stCls(d.status)} w-st`; });
+  tr.querySelectorAll("[data-ro]").forEach(td=>{ const c = GCOLS.find(x=>x.k===td.dataset.ro); const v = d[c.k]; td.textContent = c.n ? fmtN(v) : (v||"—"); });
+  const fl = tr.firstElementChild; const tmp = document.createElement("tbody"); tmp.innerHTML = `<tr>${cellHTML(GCOLS[0], d)}</tr>`; fl.replaceWith(tmp.firstElementChild.firstElementChild);
+}
+let saveQ = Promise.resolve();
+function cellChanged(el){
+  const tr = el.closest("tr"), id = tr.dataset.id, raw = S.reqs.get(id); if(!raw || !S.canWrite) return;
+  const f = el.dataset.f, now = new Date().toISOString(), by = S.me||null;
+  let v = el.value; const patch = {};
+  const cur = derive(raw);
+  if(f==="wd"){ v = v.trim().toUpperCase(); if(v===raw.wd) return; patch.wd = v; }
+  else if(f==="superintendente"){ patch.superintendente = v.trim().toUpperCase(); }
+  else if(f==="status"){ if(v===raw.status) return; patch.status = v; patch.hist = [...(raw.hist||[]), {d:now, t:`Status: ${raw.status||"—"} → ${v}`, tipo:"status", by}]; }
+  else if(f==="nota"){ v = v.trim(); if(!v || v===cur.nota) return; patch.hist = [...(raw.hist||[]), {d:now, t:v, tipo:"nota", by}]; }
+  else if(f==="cidade"){ patch.cidade = v; }
+  else if(f==="carteira"){ v = v.trim().toUpperCase(); patch.carteira = v; const c = cartByName(v);
+    if(c){ if(c.superintendente) patch.superintendente = c.superintendente; if(c.cidade) patch.cidade = c.cidade; if(c.diasTreino) patch.diasTreino = c.diasTreino; } }
+  else if(f==="necessidade"){ const n = num(v)||0; patch.necessidade = n; const pct = raw.bufferPct ?? (raw.necessidade ? Math.round((num(raw.buffer)||0)/raw.necessidade*100) : 50); patch.buffer = Math.round(n*pct/100); patch.bufferPct = pct; }
+  else if(f==="buffer"){ const b = num(v)||0; patch.buffer = b; patch.bufferPct = raw.necessidade ? Math.round(b/raw.necessidade*100) : 50; }
+  else if(f==="selecionados" || f==="noShow"){ patch[f] = num(v); const sel = f==="selecionados" ? num(v) : num(raw.selecionados), ns = f==="noShow" ? num(v) : num(raw.noShow); if(sel!=null) patch.presente = sel-(ns||0); }
+  else if(f==="presente" || f==="diasTreino"){ patch[f] = num(v); }
+  else if(f==="abertura" || f==="inicioTreino"){ patch[f] = v || null; }
+  else if(f==="alo"){ if(v){ patch.alo = v; patch.aloManual = true; } else { patch.alo = null; patch.aloManual = false; } }
+  else return;
+  patch.atualizadoEm = now; patch.atualizadoPor = by;
+  S.reqs.set(id, {...raw, ...patch});
+  refreshRow(tr);
+  saveQ = saveQ.then(()=>S.db.collection("reqs").doc(id).update(patch)).then(()=>{ tr.classList.remove("saved"); void tr.offsetWidth; tr.classList.add("saved"); }, err=>{ S.reqs.set(id, raw); refreshRow(tr); writeErr(err); });
+}
+async function addRow(){
+  if(!S.canWrite || !S.db){ toast("Você não tem permissão para incluir requisições."); return; }
+  if(S.tab!=="requisicoes") document.querySelector('.tab[data-tab="requisicoes"]').click();
+  const now = new Date().toISOString(), by = S.me||null;
+  const ref = S.db.collection("reqs").doc();
+  const doc = { wd:"", status:"ABERTO", carteira:"", superintendente:"", cidade:"", necessidade:0, buffer:0, bufferPct:50, selecionados:null, noShow:null, presente:null,
+    abertura:todayISO(), inicioTreino:suggestedStart(), diasTreino:null, aloManual:false, alo:null, hist:[{d:now, t:"Requisição cadastrada.", tipo:"status", by}], candidatos:[], criadoEm:now, criadoPor:by, atualizadoEm:now };
+  S.pinned.add(ref.id); S.reqs.set(ref.id, doc); renderTable();
+  const inp = document.querySelector(`#tb tr[data-id="${ref.id}"] input[data-f="wd"]`); if(inp){ inp.focus(); inp.scrollIntoView({block:"nearest"}); }
+  try{ await ref.set(doc); toast("Nova linha incluída. Preencha Workday, carteira e necessidade."); }catch(e){ S.reqs.delete(ref.id); S.pinned.delete(ref.id); renderTable(); writeErr(e); }
+}
+document.addEventListener("change", e=>{ const el = e.target.closest("#tb [data-f]"); if(el) cellChanged(el); });
+document.addEventListener("keydown", e=>{ const el = e.target.closest("#tb input[data-f]"); if(el && e.key==="Enter"){ e.preventDefault(); el.blur(); } });
+document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(S.pendingRender && !$("#tb").contains(document.activeElement)){ S.pendingRender = false; schedule(); } }, 60); });
+
+/* ---------- vagas entregues ---------- */
+function renderEntregues(){
+  const all = rows(); const cid = $("#eCidade").value, incl = $("#eOpen").checked;
+  fillSelect($("#eCidade"), [...new Set(all.map(r=>r.cidade).filter(Boolean))].sort(), true);
+  const list = scoped(all).filter(r=>(!cid || r.cidade===cid) && (r.status==="ENTREGUE" || r.status==="FECHADA" || (incl && OPEN.has(r.status) && (r.presente||0)>0)))
+    .sort((a,b)=>(b.alo||b.inicioTreino||"").localeCompare(a.alo||a.inicioTreino||""));
+  const sum = l => l.reduce((a,r)=>({n:a.n+1, nec:a.nec+r.necessidade, sel:a.sel+(r.selecionados||0), pr:a.pr+(r.presente||0), ns:a.ns+(r.noShow||0)}), {n:0,nec:0,sel:0,pr:0,ns:0});
+  const T = sum(list), pc = (a,b) => b ? Math.round(a/b*100)+"%" : "—";
+  $("#entKpis").innerHTML = [
+    ["Requisições", T.n.toLocaleString("pt-BR"), incl?"entregues e em andamento":"entregues ou fechadas"],
+    ["Vagas solicitadas", fmtN(T.nec), "soma da necessidade"],
+    ["Vagas entregues", fmtN(T.pr), "presentes no treinamento"],
+    ["Atingimento", pc(T.pr,T.nec), "entregues ÷ solicitadas"],
+    ["No show / desistentes", fmtN(T.ns), `${pc(T.ns,T.sel)} dos ${fmtN(T.sel)} selecionados`],
+  ].map(([l,v,h])=>`<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="h">${esc(h)}</span></div>`).join("");
+  $("#countE").textContent = `${list.length.toLocaleString("pt-BR")} requisições`;
+  const groups = new Map(); list.forEach(r=>{ const k = (r.alo||r.inicioTreino||"").slice(0,7) || "sem"; (groups.get(k) || groups.set(k, []).get(k)).push(r); });
+  let html = "";
+  for(const [k, l] of groups){ const g = sum(l);
+    html += `<tr class="grp"><td colspan="4">${k==="sem" ? "Sem data de ALO" : mesLabel(k)} · ${g.n} requisições</td><td class="n">${fmtN(g.nec)}</td><td class="n">${fmtN(g.sel)}</td><td class="n">${fmtN(g.pr)}</td><td class="n">${fmtN(g.ns)}</td><td>${pc(g.pr,g.nec)}</td><td colspan="3"></td></tr>`;
+    html += l.map(r=>{ const p = r.necessidade ? Math.min(1,(r.presente||0)/r.necessidade) : 0;
+      return `<tr data-id="${esc(r._id)}" tabindex="0"><td><span class="mono">${esc(r.wd)}</span>${r.status!=="ENTREGUE"?` <span class="pill ${stCls(r.status)}">${esc(r.status)}</span>`:""}</td><td>${esc(r.superintendente)}</td><td>${esc(r.carteira)}</td><td>${esc(r.cidade)}</td>
+        <td class="n">${fmtN(r.necessidade)}</td><td class="n">${fmtN(r.selecionados)}</td><td class="n"><b>${fmtN(r.presente)}</b></td><td class="n">${fmtN(r.noShow)}</td>
+        <td><div class="fill"><div class="bar"><i class="${p>=1?"full":""}" style="width:${Math.round(p*100)}%"></i></div><b>${Math.round(p*100)}%</b></div></td>
+        <td>${br(r.inicioTreino)}</td><td>${br(r.alo)}</td><td>${r.sp?`<span class="pill st-COMPLEMENTAR" title="${esc((r.sp.arquivos||[]).join(", "))}">SharePoint</span>`:r.origem==="planilha"?`<span class="hint">planilha</span>`:`<span class="hint">manual</span>`}</td></tr>`; }).join("");
+  }
+  $("#tbe").innerHTML = html || `<tr><td colspan="12"><div class="empty"><h3>Nenhuma vaga entregue nesse filtro</h3><p>As requisições com status Entregue aparecem aqui, agrupadas pelo mês do ALO.</p></div></td></tr>`;
 }
 
 /* ---------- painel ---------- */
@@ -502,21 +632,15 @@ function renderCarteiras(){
   $("#tbc").innerHTML = list.map(([id,c])=>`<tr data-cid="${esc(id)}" tabindex="0"><td><b>${esc(c.nome)}</b></td><td>${esc(c.superintendente)}</td><td>${esc(c.conta)}</td><td>${esc(c.cidade)}</td><td class="n">${esc(c.diasTreino)}</td><td>${esc(c.activity)}<span class="sub mono">${esc(c.actId)}</span></td><td>${esc(c.treinador)}</td><td>${esc(c.recrutamento)}</td></tr>`).join("")
     || `<tr><td colspan="8"><div class="empty"><h3>Nenhuma carteira</h3><p>O cadastro de carteiras define superintendente, cidade e dias de treinamento de cada requisição.</p></div></td></tr>`;
 }
-function renderFeriados(){
-  const list = [...S.fer].sort((a,b)=>a.data.localeCompare(b.data));
-  const wd = ["dom","seg","ter","qua","qui","sex","sáb"];
-  $("#tbf").innerHTML = list.map((f,i)=>`<tr style="cursor:default"><td class="mono">${br(f.data)}</td><td>${wd[parse(f.data).getUTCDay()]}</td><td>${esc(f.nome)}</td><td class="n">${S.canWrite?`<button class="btn sm ghost" data-delfer="${esc(f.data)}" type="button" aria-label="Remover ${esc(f.nome)}">Remover</button>`:""}</td></tr>`).join("")
-    || `<tr><td><div class="empty"><p>Nenhum feriado cadastrado. O ALO conta só os domingos como folga.</p></div></td></tr>`;
-}
 function renderAll(){
   document.body.classList.toggle("ro", !S.canWrite);
   if(S.tab==="requisicoes") renderTable();
   if(S.tab==="painel"){ renderFilters(rows()); renderPainel(); }
   if(S.tab==="carteiras") renderCarteiras();
-  if(S.tab==="feriados") renderFeriados();
+  if(S.tab==="entregues"){ const all=rows(); renderFilters(all); renderSummary(scoped(all)); renderEntregues(); }
   renderBanner();
 }
-let rT; function schedule(){ cancelAnimationFrame(rT); rT=requestAnimationFrame(renderAll); }
+let rT; function schedule(){ if(S.tab==="requisicoes" && $("#tb").contains(document.activeElement)){ S.pendingRender = true; return; } cancelAnimationFrame(rT); rT=requestAnimationFrame(renderAll); }
 
 /* ---------- formulário da requisição ---------- */
 function cartByName(n){ const k=(n||"").trim().toUpperCase(); for(const c of S.cart.values()) if(c.nome.toUpperCase()===k) return c; return null; }
@@ -739,18 +863,20 @@ function renderBanner(){
 document.addEventListener("click", e=>{
   if(e.target.closest("[data-close]")){ closeDrawer(); return; }
   if(e.target.closest("#drawerHost")) return;
-  const tab = e.target.closest(".tab"); if(tab){ S.tab = tab.dataset.tab; document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t===tab)); ["requisicoes","painel","carteiras","feriados"].forEach(v=>$("#v-"+v).hidden = v!==S.tab); try{localStorage.setItem("req.tab",S.tab)}catch{} renderAll(); return; }
+  const tab = e.target.closest(".tab"); if(tab){ S.tab = tab.dataset.tab; document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t===tab)); ["requisicoes","entregues","painel","carteiras"].forEach(v=>$("#v-"+v).hidden = v!==S.tab); $("#scopeBox").hidden = !["requisicoes","entregues"].includes(S.tab); try{localStorage.setItem("req.tab",S.tab)}catch{} renderAll(); return; }
   const chip = e.target.closest("#fStatus .chip"); if(chip){ const s=chip.dataset.s; S.status.has(s)?S.status.delete(s):S.status.add(s); S.limit=100; renderTable(); return; }
   if(e.target.closest("#fAlert")){ S.alertOnly=!S.alertOnly; $("#fAlert").setAttribute("aria-pressed",S.alertOnly); renderTable(); return; }
-  const gr = e.target.closest(".sum[data-grp]"); if(gr){ S.status = new Set(GROUPS[gr.dataset.grp]); S.alertOnly=false; $("#fAlert").setAttribute("aria-pressed",false); S.limit=100; renderTable(); return; }
-  if(e.target.closest("#btnClearScope")){ ["fAno","fSup","fCart"].forEach(i=>$("#"+i).value=""); S.limit=100; renderTable(); return; }
+  const gr = e.target.closest(".sum[data-grp]"); if(gr && S.tab!=="requisicoes"){ document.querySelector('.tab[data-tab="requisicoes"]').click(); }
+  if(gr){ S.status = new Set(GROUPS[gr.dataset.grp]); S.alertOnly=false; $("#fAlert").setAttribute("aria-pressed",false); S.limit=100; renderTable(); return; }
+  if(e.target.closest("#btnClearScope")){ ["fAno","fSup","fCart"].forEach(i=>$("#"+i).value=""); S.limit=100; renderAll(); return; }
   const k = e.target.closest(".kpi[data-act]"); if(k){ if(k.dataset.act==="open"){ S.status=new Set(OPEN); S.alertOnly=false; } else { S.status=new Set(OPEN); S.alertOnly=true; } $("#fAlert").setAttribute("aria-pressed",S.alertOnly); renderTable(); return; }
-  const th = e.target.closest("#tbl th"); if(th){ const kk=th.dataset.k; S.sort = {k:kk, dir: S.sort.k===kk ? -S.sort.dir : (["wd","carteira","cidade","status","nota"].includes(kk)?1:-1)}; renderTable(); return; }
-  const tr = e.target.closest("#tb tr"); if(tr){ openReq(tr.dataset.id); return; }
+  const th = e.target.closest("#tbl th[data-k]"); if(th){ const kk=th.dataset.k; S.sort = {k:kk, dir: S.sort.k===kk ? -S.sort.dir : (["wd","carteira","cidade","status","nota"].includes(kk)?1:-1)}; renderTable(); return; }
+  const rm = e.target.closest("#tb .rowmore"); if(rm){ openReq(rm.closest("tr").dataset.id); return; }
+  const er = e.target.closest("#tbe tr[data-id]"); if(er){ openReq(er.dataset.id); return; }
   const cr = e.target.closest("#tbc tr[data-cid]"); if(cr){ openCart(cr.dataset.cid); return; }
   const df = e.target.closest("[data-delfer]"); if(df){ saveFer(S.fer.filter(f=>f.data!==df.dataset.delfer)); return; }
   if(e.target.closest("#btnMore")){ S.limit+=200; renderTable(); return; }
-  if(e.target.closest("#btnNew")){ openReq(null); return; }
+  if(e.target.closest("#btnNew")){ addRow(); return; }
   if(e.target.closest("#btnNewCart")){ openCart(null); return; }
   if(e.target.closest("#btnExport")){ exportXlsx(); return; }
   if(e.target.closest("#btnImport")){ importSeed(); return; }
@@ -758,12 +884,13 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
-  if(e.key==="Enter" && e.target.matches("#tb tr, #tbc tr")) e.target.click();
+  if(e.key==="Enter" && e.target.matches("#tbc tr, #tbe tr")) e.target.click();
 });
-["q","fCidade","fAno","fSup","fCart","fMes"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderTable(); }));
+["q","fCidade","fMes"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderTable(); }));
+["fAno","fSup","fCart"].forEach(id=>$("#"+id).addEventListener("input", ()=>{ S.limit=100; renderAll(); }));
 ["pAno","pCidade"].forEach(id=>$("#"+id).addEventListener("change", renderPainel));
 $("#qc").addEventListener("input", renderCarteiras);
-$("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#ferData").value, n=$("#ferNome").value.trim(); if(!d||!n) return; saveFer([...S.fer.filter(f=>f.data!==d), {data:d,nome:n}]); e.target.reset(); });
+["eCidade","eOpen"].forEach(id=>$("#"+id).addEventListener("change", renderEntregues));
 
 /* ---------- SharePoint (Microsoft 365) ---------- */
 const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrhdv7WpHnGztjhRK6kSuTrXlRyj_aiJA",
