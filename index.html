@@ -58,6 +58,9 @@ main{padding-block:16px 48px}
 .notice{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .notice.warn{border-color:var(--warn);background:var(--warn-soft)}
 .notice p{margin:0;flex:1;min-width:220px}
+.spn{padding:10px 14px}
+.sp-ico{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;flex:none}
+@keyframes pulse{from{opacity:.35}to{opacity:1}}
 .progress{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;min-width:160px;flex:1}
 .progress i{display:block;height:100%;background:var(--accent);width:0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
@@ -193,6 +196,7 @@ label.f input,label.f select{width:100%}
 
 <main class="wrap" id="main">
   <div id="banner"></div>
+  <div id="spbar"></div>
 
   <section id="v-requisicoes">
     <div class="scope">
@@ -332,7 +336,7 @@ function derive(r){
   const nec = num(r.necessidade)||0, buf = num(r.buffer)||0;
   let sel = num(r.selecionados), ns = num(r.noShow), pr = num(r.presente);
   const c = Array.isArray(r.candidatos) ? r.candidatos : [];
-  if(c.length){ sel=c.length; ns=c.filter(x=>x.s==="NO SHOW").length; pr=sel-ns; }
+  if(c.length){ sel=c.length; ns=c.filter(x=>x.s==="NO SHOW").length; pr=c.filter(x=>x.s!=="NO SHOW" && x.s!=="PENDENTE").length; }
   else if(pr==null && sel!=null) pr = sel-(ns||0);
   const alo = r.aloManual ? r.alo : (addWorkdays(r.inicioTreino, r.diasTreino) || r.alo || null);
   const total = nec+buf;
@@ -552,7 +556,7 @@ function openReq(id){
         <label class="f">Presentes<span class="calc" id="r_pr">—</span></label>
         <label class="f">Preenchimento<span class="calc" id="r_pct">—</span></label>
         <div class="f wide" style="display:flex;flex-direction:column;gap:6px">
-          <span class="hint">Lista de candidatos (opcional). Com a lista preenchida, os números acima são contados automaticamente.</span>
+          <span class="hint">${r.sp ? `Lista lida do SharePoint em ${br(r.sp.at.slice(0,10))} ${r.sp.at.slice(11,16)} · ${esc((r.sp.arquivos||[]).join(", "))}` : "Lista de candidatos (opcional). Com a lista preenchida, os números acima são contados automaticamente."}</span>
           ${ro?"":`<div class="inline"><textarea id="r_paste" rows="2" placeholder="Cole IDs do Workday, um por linha ou separados por vírgula"></textarea><button class="btn sm" type="button" id="btnAddC">Adicionar</button></div>`}
           <div class="cands" id="cands"></div>
         </div>
@@ -582,9 +586,11 @@ function openReq(id){
     if(from==="buf") F("r_bpct").value = nec ? Math.round((num(F("r_buf").value)||0)/nec*100) : 0;
     const total = nec + (num(F("r_buf").value)||0);
     F("r_total").textContent = fmtN(total);
-    if(cands.length){ F("r_sel").value=cands.length; F("r_ns").value=cands.filter(x=>x.s==="NO SHOW").length; F("r_sel").readOnly=F("r_ns").readOnly=true; } else if(!ro){ F("r_sel").readOnly=F("r_ns").readOnly=false; }
+    if(cands.length){ F("r_sel").value=cands.length; F("r_ns").value=cands.filter(x=>x.s==="NO SHOW").length; F("r_sel").readOnly=F("r_ns").readOnly=true; }
+    else if(!ro){ F("r_sel").readOnly=F("r_ns").readOnly=false; }
+    const prList = cands.length ? cands.filter(x=>x.s!=="NO SHOW" && x.s!=="PENDENTE").length : null;
     const sel = num(F("r_sel").value), ns = num(F("r_ns").value);
-    const pr = sel==null ? (src && !cands.length && from==="init" ? num(r.presente) : null) : sel-(ns||0);
+    const pr = prList!=null ? prList : sel==null ? (src && from==="init" ? num(r.presente) : null) : sel-(ns||0);
     F("r_pr").textContent = fmtN(pr); F("r_pct").textContent = nec ? Math.round(Math.min(1,(pr||0)/nec)*100)+"%" : "—";
     F("r_pr").dataset.v = pr ?? "";
     const man = F("r_aloMan").checked; F("r_alo").readOnly = ro || !man;
@@ -596,7 +602,7 @@ function openReq(id){
   };
   const renderCands = () => {
     F("cands").innerHTML = cands.map((c,i)=>`<div class="cand"><span class="mono">${esc(c.id)}</span>
-      <span class="seg"><button type="button" class="p" data-ci="${i}" data-s="PRESENTE" aria-pressed="${c.s!=="NO SHOW"}" ${ro?"disabled":""}>Presente</button><button type="button" class="n" data-ci="${i}" data-s="NO SHOW" aria-pressed="${c.s==="NO SHOW"}" ${ro?"disabled":""}>No show</button></span>
+      <span class="seg"><button type="button" class="p" data-ci="${i}" data-s="PRESENTE" aria-pressed="${c.s==="PRESENTE"}" ${ro?"disabled":""}>Presente</button><button type="button" class="n" data-ci="${i}" data-s="NO SHOW" aria-pressed="${c.s==="NO SHOW"}" ${ro?"disabled":""}>No show</button></span>${c.s==="PENDENTE"?`<span class="hint">sem presença</span>`:""}
       ${ro?"":`<button type="button" class="btn sm ghost" data-rm="${i}" aria-label="Remover ${esc(c.id)}">✕</button>`}</div>`).join("");
     recalc();
   };
@@ -748,6 +754,7 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#btnNewCart")){ openCart(null); return; }
   if(e.target.closest("#btnExport")){ exportXlsx(); return; }
   if(e.target.closest("#btnImport")){ importSeed(); return; }
+  if(e.target.closest("#btnSpSync")){ spSync(true); return; }
 });
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
@@ -757,6 +764,143 @@ document.addEventListener("keydown", e=>{
 ["pAno","pCidade"].forEach(id=>$("#"+id).addEventListener("change", renderPainel));
 $("#qc").addEventListener("input", renderCarteiras);
 $("#ferForm").addEventListener("submit", e=>{ e.preventDefault(); const d=$("#ferData").value, n=$("#ferNome").value.trim(); if(!d||!n) return; saveFer([...S.fer.filter(f=>f.data!==d), {data:d,nome:n}]); e.target.reset(); });
+
+/* ---------- SharePoint (Microsoft 365) ---------- */
+const SP = { server:"Microsoft 365", drive:"b!6BTJaW-KU0edtGdZVnHviNWDxwo1LFNLrhdv7WpHnGztjhRK6kSuTrXlRyj_aiJA",
+  roots:["ADMISSÃO E TREINAMENTO/CURITIBA"], mcp:null, state:"off", msg:"", index:null, meta:null, running:false, prog:"" };
+const normWD = s => { const m = String(s||"").toUpperCase().match(/R\s*0*(\d{6,8})/); return m ? "R"+m[1] : ""; };
+const normH = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
+function resultText(res){ const b = (res && res.content) || []; const t = b.filter(x=>x.type==="text").map(x=>x.text).join("\n"); return t || (typeof res?.payload==="string" ? res.payload : ""); }
+async function spRead(uri, startPage){
+  const input = startPage ? {uri, startPage} : {uri};
+  let tries = 0;
+  for(;;){ try{ return resultText(await SP.mcp.callTool(SP.server, "read_resource", input, {cache:false})); }
+    catch(e){ if(e && e.retryable && tries<1){ tries++; await new Promise(r=>setTimeout(r, (e.retryAfterMs||1500)+Math.random()*800)); continue; } throw e; } }
+}
+function parseListing(text){
+  const out = [], re = /([^\n]*?) \((folder|file), \d+ bytes\) file:\/\/\/([^\/\s]+)\/([A-Za-z0-9]{34})/g; let m;
+  while((m = re.exec(text))) out.push({name:m[1].trim(), type:m[2], drive:m[3], id:m[4]});
+  const next = text.match(/startPage=(\d+)/); return {items:out, next: next ? +next[1] : null};
+}
+async function spCrawl(){
+  const files = {}; let folders = 0, failed = 0;
+  const queue = SP.roots.map(p=>`file:///${SP.drive}/${p}`);
+  const worker = async () => { while(queue.length){ const uri = queue.shift(); folders++;
+    if(folders > 800) return;
+    SP.prog = `Lendo pastas do SharePoint… ${folders} pastas, ${Object.keys(files).length} requisições encontradas`; renderSpBar();
+    try{ let page = null, guard = 0;
+      do{ const {items, next} = parseListing(await spRead(uri, page)); page = next; guard++;
+        items.forEach(it=>{ if(it.type==="folder") queue.push(`file:///${it.drive}/${it.id}`);
+          else if(/\.xlsx?$/i.test(it.name)){ const wd = normWD(it.name.match(/^\s*R\s*\d{6,8}/i)?.[0]); if(wd) (files[wd] = files[wd]||[]).push([it.id, it.name.slice(0,60), it.drive===SP.drive?0:it.drive]); } });
+      } while(page && guard < 20);
+    }catch(e){ failed++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
+  } };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  let doc = {crawledAt:new Date().toISOString(), by:S.me||null, files, folders, failed};
+  if(JSON.stringify(doc).length > 240000){ const mine = new Set([...S.reqs.values()].map(r=>normWD(r.wd))); doc.files = Object.fromEntries(Object.entries(files).filter(([k])=>mine.has(k))); }
+  await S.db.doc("sp/index").set(doc);
+  SP.index = doc; return doc;
+}
+function parseSheet(text, fileWD){
+  const rows = []; let cols = null;
+  for(const line of text.split("\n")){
+    if(/^## /.test(line) || /^Formulas/i.test(line)){ cols = null; continue; }
+    const cells = line.split("\t");
+    if(!cols){ const H = cells.map(normH); const iReq = H.indexOf("REQ"), iId = H.indexOf("ID"), iP = H.findIndex(h=>h.startsWith("PRESEN"));
+      if(iId>=0 && iP>=0) cols = {req:iReq, id:iId, p:iP, fin:H.findIndex(h=>h.startsWith("STATUS FINAL")), des:H.findIndex(h=>h.includes("DESISTENTE"))};
+      continue; }
+    const id = (cells[cols.id]||"").trim(); if(!/^\d{5,}$/.test(id)) continue;
+    const p = normH(cells[cols.p]), fin = cols.fin>=0 ? normH(cells[cols.fin]) : "", des = cols.des>=0 ? normH(cells[cols.des]) : "";
+    let s = "PENDENTE";
+    if(/NO ?SHOW|DESIST|FALT/.test(p) || /DESIST/.test(fin) || (des && !/^(NAO|N|-)$/.test(des))) s = "NO SHOW";
+    else if(/PRESENT/.test(p)) s = "PRESENTE";
+    rows.push({wd: normWD(cells[cols.req]) || fileWD, id, s, ...(fin ? {fin: fin.slice(0,40)} : {})});
+  }
+  return rows;
+}
+function spTargets(){
+  const t = todayISO(), out = [];
+  for(const [docId, r] of S.reqs){
+    if(r.status==="CANCELADA") continue;
+    const wd = normWD(r.wd); const f = SP.index?.files?.[wd]; if(!f) continue;
+    const recent = (r.inicioTreino && diffDays(t, r.inicioTreino) <= 60) || (r.alo && diffDays(t, r.alo) <= 45);
+    if(OPEN.has(r.status) || recent || !r.sp) out.push({docId, r, wd, files:f});
+  }
+  return out;
+}
+async function spSync(force){
+  if(SP.running || !SP.mcp || !S.db || !S.canWrite) return;
+  SP.running = true; SP.state = "run"; SP.msg = ""; renderSpBar();
+  const lock = S.db.doc("sp/lock");
+  try{
+    const l = await lock.acquire({holder: S.me || "anon", ttlMs: 300000}).catch(()=>({acquired:true}));
+    if(!l.acquired){ SP.state = "ok"; SP.msg = "Outra pessoa está sincronizando agora. Os dados chegam em instantes."; return; }
+    const age = SP.index?.crawledAt ? (Date.now() - Date.parse(SP.index.crawledAt))/36e5 : 99;
+    if(force || age > 6 || !SP.index) await spCrawl();
+    const targets = spTargets(); let done = 0, changed = 0, errs = 0;
+    const queue = [...targets];
+    const worker = async () => { while(queue.length){ const t = queue.shift();
+      SP.prog = `Lendo turmas no SharePoint… ${done} de ${targets.length}`; renderSpBar();
+      try{
+        const byId = new Map(); const names = [];
+        for(const [itemId, name, drv] of t.files){ names.push(name);
+          const rows = parseSheet(await spRead(`file:///${drv||SP.drive}/${itemId}`), t.wd);
+          rows.filter(x=>x.wd===t.wd).forEach(x=>{ const prev = byId.get(x.id); if(!prev || prev.s==="PENDENTE" || x.s==="NO SHOW") byId.set(x.id, {id:x.id, s:x.s, ...(x.fin?{fin:x.fin}:{})}); });
+        }
+        const cands = [...byId.values()];
+        const cur = S.reqs.get(t.docId) || t.r;
+        if(cands.length && JSON.stringify(cands) !== JSON.stringify(cur.candidatos||[])){
+          const pr = cands.filter(c=>c.s==="PRESENTE").length, ns = cands.filter(c=>c.s==="NO SHOW").length, pe = cands.length-pr-ns;
+          const old = cur.candidatos||[]; const oPr = old.filter(c=>c.s==="PRESENTE").length, oNs = old.filter(c=>c.s==="NO SHOW").length;
+          const hist = [...(cur.hist||[])];
+          if(pr!==oPr || ns!==oNs) hist.push({d:new Date().toISOString(), t:`SharePoint: ${pr} presentes, ${ns} no show/desistentes${pe?`, ${pe} sem presença marcada`:""} (${cands.length} na lista).`, tipo:"status", fonte:"sharepoint"});
+          await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names}});
+          changed++;
+        } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
+      }catch(e){ errs++; if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"].includes(e?.code)) throw e; }
+      done++; } };
+    await Promise.all([worker(),worker(),worker()]);
+    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, erros:errs};
+    await S.db.doc("sp/status").set(meta).catch(()=>{});
+    SP.state = "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas${errs?`, ${errs} arquivos não puderam ser lidos`:""}.`;
+  }catch(e){ spError(e); }
+  finally{ SP.running = false; SP.prog = ""; renderSpBar(); }
+}
+function spError(e){
+  const c = e?.code;
+  SP.state = "err";
+  SP.msg = c==="needs_reauth" ? "A conexão com o Microsoft 365 expirou. Reconecte em claude.ai → Configurações → Conectores."
+    : c==="server_not_connected" ? "Conecte o Microsoft 365 em claude.ai → Configurações → Conectores para ler o SharePoint."
+    : (c==="not_in_manifest" || c==="approval_required" || c==="consent_required") ? "A página precisa da sua permissão para ler o SharePoint. Clique em Sincronizar e aceite."
+    : c==="blocked_by_policy" ? "A política da empresa bloqueia a leitura do SharePoint por aqui."
+    : "Não foi possível ler o SharePoint agora. Tente de novo em alguns minutos.";
+}
+function renderSpBar(){
+  const el = $("#spbar"); if(!el) return;
+  if(SP.state==="off"){ el.innerHTML = ""; return; }
+  const when = SP.meta?.at ? new Date(SP.meta.at) : null;
+  const ago = when ? Math.round((Date.now()-when)/6e4) : null;
+  const agoTxt = ago==null ? "ainda não sincronizado" : ago < 1 ? "agora" : ago < 60 ? `há ${ago} min` : ago < 1440 ? `há ${Math.round(ago/60)} h` : `em ${br(SP.meta.at.slice(0,10))}`;
+  el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b><span class="sub">${
+    SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Presentes e no show das turmas, atualizados ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
+    SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
+    : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync">Sincronizar agora</button>` : ""}</div>`;
+}
+async function spStart(){
+  const mcp = await claude.use("mcp").catch(()=>null); if(!mcp || !S.db) return;
+  SP.mcp = mcp; SP.state = "idle"; renderSpBar();
+  S.db.doc("sp/index").onSnapshot(s=>{ SP.index = s.exists ? s.data() : null; }, ()=>{});
+  S.db.doc("sp/status").onSnapshot(s=>{ SP.meta = s.exists ? s.data() : null; if(!SP.running) renderSpBar(); }, ()=>{});
+  let st = "prompt";
+  try{ const perms = await claude.use("permissions"); st = perms ? await perms.state("mcp:"+SP.server).catch(()=>"unavailable") : "prompt"; }catch{}
+  if(st==="unavailable"){ SP.state="err"; SP.msg="Conecte o Microsoft 365 em claude.ai → Configurações → Conectores para ler o SharePoint."; renderSpBar(); return; }
+  if(st!=="granted"){ SP.state="idle"; SP.msg = "Clique em Sincronizar para permitir que a página leia as listas de presença do SharePoint."; renderSpBar(); return; }
+  // espera o banco carregar e sincroniza se a última foi há mais de 30 min
+  const wait = () => new Promise(r=>{ const t0=Date.now(); const i=setInterval(()=>{ if(S.live || Date.now()-t0>15000){ clearInterval(i); r(); } }, 300); });
+  await wait(); await new Promise(r=>setTimeout(r, 1500));
+  const age = SP.meta?.at ? (Date.now()-Date.parse(SP.meta.at))/6e4 : 9999;
+  if(age > 30 && S.canWrite && S.reqs.size) spSync(false);
+}
 
 /* ---------- conexão ---------- */
 function setSync(state, txt){ $("#syncDot").className = "dot " + (state||""); $("#syncTxt").textContent = txt; }
@@ -783,6 +927,7 @@ async function start(){
   }, err=>{ clearTimeout(timer); setSync("err","Banco indisponível"); });
   db.collection("carteiras").onSnapshot(snap=>{ snap.docChanges().forEach(ch=>{ if(ch.type==="removed") S.cart.delete(ch.doc.id); else S.cart.set(ch.doc.id, ch.doc.data()); }); schedule(); }, ()=>{});
   db.doc("config/feriados").onSnapshot(s=>{ S.fer = (s.exists && s.data().lista) || []; schedule(); }, ()=>{});
+  spStart();
 }
 start();
 })();
