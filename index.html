@@ -606,6 +606,7 @@ async function markDelivered(ids){
     try{ await S.db.collection("reqs").doc(id).update(patch); S.reqs.set(id, {...raw, ...patch}); ok++; }catch(e){ writeErr(e); break; } }
   if(ok) toast(ok>1 ? `${ok} requisições marcadas como entregues.` : "Requisição marcada como entregue.");
   S.readyConfirm = false; schedule();
+  if(ok && SP.mcp && !SP.running) setTimeout(()=>spSync(false), 1500);
 }
 function cellChanged(el){
   const tr = el.closest("tr"), id = tr.dataset.id, raw = S.reqs.get(id); if(!raw || !S.canWrite) return;
@@ -1175,8 +1176,10 @@ function spTargets(onlyId){
     if(onlyId && docId!==onlyId) continue;
     if(!onlyId && r.status==="CANCELADA") continue;
     const wd = normWD(r.wd); if(!wd) continue;
-    const recent = r.alo && r.alo <= t && diffDays(t, r.alo) <= 15;
-    if(onlyId || OPEN.has(r.status) || recent) out.push({docId, r, wd});
+    // abertas: sempre. Entregues: uma leitura final (ALO nos últimos 60 dias), depois ficam congeladas. Canceladas/migradas: nunca.
+    const fechada = r.status==="ENTREGUE" || r.status==="FECHADA";
+    const leituraFinal = fechada && !r.sp?.final && r.alo && r.alo <= t && diffDays(t, r.alo) <= 60;
+    if(onlyId || OPEN.has(r.status) || leituraFinal) out.push({docId, r, wd, final: fechada});
   }
   return out;
 }
@@ -1275,9 +1278,9 @@ async function spSync(full, onlyId){
           const old = cur.candidatos||[]; const oPr = old.filter(c=>c.s==="PRESENTE").length, oNs = old.filter(c=>c.s==="NO SHOW").length;
           const hist = [...(cur.hist||[])];
           if(pr!==oPr || ns!==oNs) hist.push({d:new Date().toISOString(), t:`SharePoint: ${pr} presentes, ${ns-dz} no show, ${dz} desistentes${pe?`, ${pe} sem presença marcada`:""} (${cands.length} na lista).`, tipo:"status", fonte:"sharepoint"});
-          await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names, vazia:false}});
+          await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names, vazia:false, final:!!t.final}});
           changed++;
-        } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:false}}); }
+        } else if(cands.length && (!cur.sp || (t.final && !cur.sp.final))){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:false, final:!!t.final}}); }
         else if(!cands.length){ vazias++; if(!cur.sp || !cur.sp.vazia) await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:true}}); }
       }catch(e){ errs++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
       done++; });
@@ -1311,7 +1314,7 @@ function renderSpBar(){
   const ago = when ? Math.round((Date.now()-when)/6e4) : null;
   const agoTxt = ago==null ? "ainda não sincronizado" : ago < 1 ? "agora" : ago < 60 ? `há ${ago} min` : ago < 1440 ? `há ${Math.round(ago/60)} h` : `em ${br(SP.meta.at.slice(0,10))}`;
   el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b> <span class="hint">Curitiba, Ponta Grossa e São Paulo · cada requisição é procurada na pasta da sua cidade e da sua conta</span><span class="sub">${
-    SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Presentes e no show das turmas, atualizados ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
+    SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Abertas: presença atualizada a cada sincronização · entregues: lidas uma vez e congeladas. Última sincronização ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
     SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
     : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync" title="Relê as listas já encontradas e procura as que ainda faltam">Sincronizar agora</button><button class="btn sm ghost" type="button" id="btnSpFull" title="Procura de novo nas pastas todas as requisições, para achar listas complementares">Procurar listas novas</button>` : ""}</div>`;
 }
