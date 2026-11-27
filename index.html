@@ -877,7 +877,7 @@ function openReq(id){
   host.addEventListener("change", e=>{ if(e.target.id==="r_carteira") recalc("cart"); if(e.target.id==="r_aloMan") recalc(); });
   host.addEventListener("click", e=>{
     const t = e.target.closest("button,[data-close]"); if(!t) return;
-    if(t.id==="btnSpOne"){ t.disabled = true; t.textContent = "Procurando no SharePoint…"; spSync(false, id).then(()=>{ toast(SP.msg); if(S.reqs.get(id)) openReq(id); }); return; }
+    if(t.id==="btnSpOne"){ t.disabled = true; t.textContent = "Procurando no SharePoint…"; spSync(true, id).then(()=>{ toast(SP.msg); if(S.reqs.get(id)) openReq(id); }); return; }
     if(t.id==="btnSug"){ F("r_ini").value = suggestedStart(); recalc(); }
     if(t.id==="btnAddC"){ const ids = F("r_paste").value.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean); const have=new Set(cands.map(c=>c.id)); ids.forEach(i=>{ if(!have.has(i)){ cands.push({id:i,s:"PRESENTE"}); have.add(i);} }); F("r_paste").value=""; renderCands(); }
     if(t.dataset.ci!=null){ cands[+t.dataset.ci].s = t.dataset.s; renderCands(); }
@@ -1024,7 +1024,8 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#btnNewCart")){ openCart(null); return; }
   if(e.target.closest("#btnExport")){ exportXlsx(); return; }
   if(e.target.closest("#btnImport")){ importSeed(); return; }
-  if(e.target.closest("#btnSpSync")){ spSync(true); return; }
+  if(e.target.closest("#btnSpSync")){ spSync(false); return; }
+  if(e.target.closest("#btnSpFull")){ spSync(true); return; }
 });
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
@@ -1174,7 +1175,7 @@ function spTargets(onlyId){
     if(onlyId && docId!==onlyId) continue;
     if(!onlyId && r.status==="CANCELADA") continue;
     const wd = normWD(r.wd); if(!wd) continue;
-    const recent = (r.inicioTreino && diffDays(t, r.inicioTreino) <= 60) || (r.alo && diffDays(t, r.alo) <= 45);
+    const recent = r.alo && r.alo <= t && diffDays(t, r.alo) <= 15;
     if(onlyId || OPEN.has(r.status) || recent) out.push({docId, r, wd});
   }
   return out;
@@ -1243,7 +1244,7 @@ async function spFind(t, ctx){
   if(!found.size && (!r.inicioTreino || diffDays(r.inicioTreino, todayISO()) <= 7)){ t.busca = "cidade"; for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, true); }
   return [...found.values()];
 }
-async function spSync(force, onlyId){
+async function spSync(full, onlyId){
   if(SP.running || !SP.mcp || !S.db || !S.canWrite) return;
   SP.running = true; SP.state = "run"; SP.msg = ""; renderSpBar();
   const lock = S.db.doc("sp/lock");
@@ -1256,11 +1257,15 @@ async function spSync(force, onlyId){
     await pool(targets, 2, async t => {
       SP.prog = onlyId ? `Procurando a lista de presença da ${t.wd}…` : `Conferindo requisição ${done+1} de ${targets.length} (${t.wd})… ${ctx.folders} pastas abertas`; renderSpBar();
       try{
-        t.files = await spFind(t, ctx); ctx.files[t.wd] = t.files;
+        const known = ctx.files[t.wd];
+        if(known && known.length && !full) t.files = known;
+        else { t.files = await spFind(t, ctx); ctx.files[t.wd] = t.files; }
         if(!t.files.length){ semArquivo++; done++; return; }
         const byId = new Map(); const names = [];
         for(const [itemId, name, drv] of t.files){ names.push(name);
-          const rows = parseSheet(await spRead(`file:///${drv||SP.drive}/${itemId}`), t.wd);
+          const txt = await spRead(`file:///${drv||SP.drive}/${itemId}`);
+          if(!/## Sheet/.test(txt)) throw {code:"leitura_incompleta", message:"O arquivo não veio como planilha: " + txt.slice(0,80)};
+          const rows = parseSheet(txt, t.wd);
           rows.filter(x=>x.wd===t.wd).forEach(x=>{ const prev = byId.get(x.id); if(!prev || prev.s==="PENDENTE" || x.s==="NO SHOW") byId.set(x.id, {id:x.id, s:x.s, ...(x.d?{d:true}:{}), ...(x.fin?{fin:x.fin}:{})}); });
         }
         const cands = [...byId.values()];
@@ -1270,9 +1275,9 @@ async function spSync(force, onlyId){
           const old = cur.candidatos||[]; const oPr = old.filter(c=>c.s==="PRESENTE").length, oNs = old.filter(c=>c.s==="NO SHOW").length;
           const hist = [...(cur.hist||[])];
           if(pr!==oPr || ns!==oNs) hist.push({d:new Date().toISOString(), t:`SharePoint: ${pr} presentes, ${ns-dz} no show, ${dz} desistentes${pe?`, ${pe} sem presença marcada`:""} (${cands.length} na lista).`, tipo:"status", fonte:"sharepoint"});
-          await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names}});
+          await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names, vazia:false}});
           changed++;
-        } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
+        } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:false}}); }
         else if(!cands.length){ vazias++; if(!cur.sp || !cur.sp.vazia) await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:true}}); }
       }catch(e){ errs++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
       done++; });
@@ -1308,7 +1313,7 @@ function renderSpBar(){
   el.innerHTML = `<div class="notice spn ${SP.state==="err"?"warn":""}"><span class="sp-ico" aria-hidden="true">⇄</span><p><b>SharePoint · Admissão e Treinamento</b> <span class="hint">Curitiba, Ponta Grossa e São Paulo · cada requisição é procurada na pasta da sua cidade e da sua conta</span><span class="sub">${
     SP.running ? esc(SP.prog||"Sincronizando…") : esc(SP.msg || `Presentes e no show das turmas, atualizados ${agoTxt}.`)}${!SP.running && SP.msg && when ? ` · última sincronização ${agoTxt}` : ""}</span></p>${
     SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
-    : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync">Sincronizar agora</button>` : ""}</div>`;
+    : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync" title="Relê as listas já encontradas e procura as que ainda faltam">Sincronizar agora</button><button class="btn sm ghost" type="button" id="btnSpFull" title="Procura de novo nas pastas todas as requisições, para achar listas complementares">Procurar listas novas</button>` : ""}</div>`;
 }
 async function spStart(){
   const mcp = await claude.use("mcp").catch(()=>null); if(!mcp || !S.db) return;
