@@ -817,7 +817,7 @@ function openReq(id){
         <label class="f">Presentes<span class="calc" id="r_pr">—</span></label>
         <label class="f">Preenchimento<span class="calc" id="r_pct">—</span></label>
         <div class="f wide" style="display:flex;flex-direction:column;gap:6px">
-          <span class="hint">${r.sp ? `Lista lida do SharePoint em ${br(r.sp.at.slice(0,10))} ${r.sp.at.slice(11,16)} · ${esc((r.sp.arquivos||[]).join(", "))}` : "Lista de candidatos (opcional). Com a lista preenchida, os números acima são contados automaticamente."}</span>
+          <span class="hint">${r.sp && r.sp.vazia ? `Lista de presença encontrada no SharePoint (${esc((r.sp.arquivos||[]).join(", "))}), ainda sem candidatos.` : r.sp ? `Lista lida do SharePoint em ${br(r.sp.at.slice(0,10))} ${r.sp.at.slice(11,16)} · ${esc((r.sp.arquivos||[]).join(", "))}` : "Lista de candidatos (opcional). Com a lista preenchida, os números acima são contados automaticamente."}</span>
           ${ro?"":`<div class="inline"><textarea id="r_paste" rows="2" placeholder="Cole IDs do Workday, um por linha ou separados por vírgula"></textarea><button class="btn sm" type="button" id="btnAddC">Adicionar</button></div>`}
           ${src && SP.mcp && !ro ? `<button class="btn sm" type="button" id="btnSpOne" style="align-self:flex-start">⇄ Atualizar esta requisição pelo SharePoint</button>` : ""}
           <div class="cands" id="cands"></div>
@@ -1052,12 +1052,18 @@ function resultText(res){ const b = (res && res.content) || []; const t = b.filt
 const SP_AUTH = ["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy","approval_required","consent_required"];
 SP.errLog = {};
 function spLogErr(e){ const c = (e && e.code) || "erro"; const o = SP.errLog[c] || (SP.errLog[c] = {n:0, msg:""}); o.n++; if(!o.msg) o.msg = String(e?.message||"").replace(/[\w.+-]+@[\w.-]+/g,"…").slice(0,160); }
+SP.pauseUntil = 0;
 async function spRead(uri, startPage){
   const input = startPage ? {uri, startPage} : {uri};
-  const waits = [2000, 6000, 15000];
+  const waits = [2000, 6000, 15000, 30000];
   for(let tries = 0;; tries++){
-    try{ return resultText(await SP.mcp.callTool(SP.server, "read_resource", input, {cache:false})); }
+    while(SP.pauseUntil > Date.now()){ const s = Math.ceil((SP.pauseUntil-Date.now())/1000); SP.prog = `O Microsoft 365 pediu uma pausa. Continuando em ${s} s…`; renderSpBar(); await new Promise(r=>setTimeout(r, Math.min(1000, SP.pauseUntil-Date.now()))); }
+    try{ const txt = resultText(await SP.mcp.callTool(SP.server, "read_resource", input, {cache:false}));
+      if(/RATE_LIMITED/.test(txt.slice(0,300))) throw {code:"tool_error", message:txt.slice(0,300)};
+      return txt; }
     catch(e){ if(SP_AUTH.includes(e?.code) || tries >= waits.length) throw e;
+      const m = String(e?.message||"").match(/wait of (\d+) seconds/i);
+      if(m || /RATE_LIMITED|429|throttl/i.test(String(e?.message||""))){ SP.pauseUntil = Math.max(SP.pauseUntil, Date.now() + Math.min(120, m ? +m[1] + 2 : 30)*1000); continue; }
       await new Promise(r=>setTimeout(r, Math.max(e?.retryAfterMs||0, waits[tries]) + Math.random()*1000)); }
   }
 }
@@ -1220,8 +1226,12 @@ async function spFind(t, ctx){
         if(nwd){ if(nwd===wd) found.set(it.id, rec); continue; }
         const m = it.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/); const d = m ? `${m[3].length===2?"20"+m[3]:m[3]}-${m[2]}-${m[1]}` : null;
         if(d && (d < lo || d > hi)) continue;
-        let wds = ctx.scanned[it.id]?.[0];
-        if(!wds){ wds = [...new Set(parseSheet(await spRead(`file:///${it.drive}/${it.id}`), "").map(x=>x.wd).filter(Boolean))]; ctx.scanned[it.id] = [wds, rec[1], rec[2]]; ctx.newScan = true; }
+        const cached = ctx.scanned[it.id];
+        let wds = cached && (cached[0].length || (cached[3] && Date.now() - cached[3] < 12*36e5)) ? cached[0] : null;
+        if(!wds){ const txt = await spRead(`file:///${it.drive}/${it.id}`);
+          wds = [...new Set(parseSheet(txt, "").map(x=>x.wd).filter(Boolean))];
+          if(wds.length || /## Sheet/.test(txt)) ctx.scanned[it.id] = [wds, rec[1], rec[2], wds.length ? 0 : Date.now()];
+          ctx.newScan = true; }
         if(wds.includes(wd)) found.set(it.id, rec);
       }
     }
@@ -1230,7 +1240,7 @@ async function spFind(t, ctx){
   // 1ª tentativa: pasta da cidade → pasta da conta da carteira
   for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, false);
   // 2ª tentativa: não achou? procura o código em todas as pastas da cidade (só as do período da turma)
-  if(!found.size){ t.busca = "cidade"; for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, true); }
+  if(!found.size && (!r.inicioTreino || diffDays(r.inicioTreino, todayISO()) <= 7)){ t.busca = "cidade"; for(const root of cityRoots(r)) await visit(`file:///${SP.drive}/${root.id}`, 0, true, true); }
   return [...found.values()];
 }
 async function spSync(force, onlyId){
@@ -1242,7 +1252,7 @@ async function spSync(force, onlyId){
     if(!l.acquired){ SP.state = "ok"; SP.msg = "Outra pessoa está sincronizando agora. Os dados chegam em instantes."; return; }
     SP.errLog = {};
     const ctx = {list:new Map(), scanned:{...(SP.index?.scanned||{})}, files:{...(SP.index?.files||{})}, folders:0, newScan:false};
-    const targets = spTargets(onlyId); let done = 0, changed = 0, errs = 0, semArquivo = 0;
+    const targets = spTargets(onlyId); let done = 0, changed = 0, errs = 0, semArquivo = 0, vazias = 0;
     await pool(targets, 2, async t => {
       SP.prog = onlyId ? `Procurando a lista de presença da ${t.wd}…` : `Conferindo requisição ${done+1} de ${targets.length} (${t.wd})… ${ctx.folders} pastas abertas`; renderSpBar();
       try{
@@ -1263,18 +1273,20 @@ async function spSync(force, onlyId){
           await S.db.collection("reqs").doc(t.docId).update({candidatos:cands, selecionados:cands.length, noShow:ns, presente:pr, hist, sp:{at:new Date().toISOString(), arquivos:names}});
           changed++;
         } else if(cands.length && !cur.sp){ await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names}}); }
+        else if(!cands.length){ vazias++; if(!cur.sp || !cur.sp.vazia) await S.db.collection("reqs").doc(t.docId).update({sp:{at:new Date().toISOString(), arquivos:names, vazia:true}}); }
       }catch(e){ errs++; spLogErr(e); if(SP_AUTH.includes(e?.code)) throw e; }
       done++; });
-    const idx = {crawledAt:new Date().toISOString(), by:S.me||null, files:ctx.files, scanned:ctx.scanned};
-    if(JSON.stringify(idx).length > 240000){ const mine = new Set([...S.reqs.values()].map(x=>normWD(x.wd))); idx.files = Object.fromEntries(Object.entries(ctx.files).filter(([k])=>mine.has(k))); }
+    const mine = new Set([...S.reqs.values()].map(x=>normWD(x.wd)));
+    const idx = {crawledAt:new Date().toISOString(), by:S.me||null, files:Object.fromEntries(Object.entries(ctx.files).filter(([k])=>mine.has(k))), scanned:ctx.scanned};
+    if(JSON.stringify(idx).length > 230000){ const lim = Date.now() - 200*864e5; idx.scanned = Object.fromEntries(Object.entries(ctx.scanned).filter(([,v])=>v[0].some(w=>mine.has(w)))); }
     await S.db.doc("sp/index").set(idx).catch(()=>{}); SP.index = idx;
     if(onlyId){ const t0 = targets[0]; SP.state = errs ? "err" : "ok";
       SP.msg = !t0 ? "Requisição sem número do Workday." : errs ? `Não foi possível ler a ${t0.wd} agora. Tente de novo em instantes.` : !t0.files?.length ? `Nenhuma lista de presença encontrada para a ${t0.wd} na pasta de ${t0.r.cidade||"nenhuma cidade"} da conta ${t0.r.carteira||"?"}.` : `${t0.wd}: ${t0.files.length} ${t0.files.length>1?"listas lidas":"lista lida"} (${t0.files.map(f=>f[1]).join(", ")}).`;
       return; }
-    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, semArquivo, erros:errs, pastas:ctx.folders, motivos:SP.errLog};
+    const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, semArquivo, listasVazias:vazias, erros:errs, pastas:ctx.folders, motivos:SP.errLog};
     await S.db.doc("sp/status").set(meta).catch(()=>{});
     const mot = Object.entries(SP.errLog).sort((a,b)=>b[1].n-a[1].n)[0];
-    SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas, ${semArquivo} ainda sem lista de presença${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
+    SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas, ${vazias} com lista ainda sem candidatos, ${semArquivo} sem lista no SharePoint${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
   }catch(e){ spError(e); }
   finally{ SP.running = false; SP.prog = ""; renderSpBar(); }
 }
