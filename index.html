@@ -1234,7 +1234,7 @@ async function spFind(t, ctx){
         let wds = cached && (cached[0].length || (cached[3] && Date.now() - cached[3] < 12*36e5)) ? cached[0] : null;
         if(!wds){ const txt = await spRead(`file:///${it.drive}/${it.id}`);
           wds = [...new Set(parseSheet(txt, "").map(x=>x.wd).filter(Boolean))];
-          if(wds.length || /## Sheet/.test(txt)) ctx.scanned[it.id] = [wds, rec[1], rec[2], wds.length ? 0 : Date.now()];
+          if(wds.length || /## Sheet/.test(txt) || /PRESEN/.test(normH(txt.slice(0,4000)))) ctx.scanned[it.id] = [wds, rec[1], rec[2], wds.length ? 0 : Date.now()];
           ctx.newScan = true; }
         if(wds.includes(wd)) found.set(it.id, rec);
       }
@@ -1267,7 +1267,7 @@ async function spSync(full, onlyId){
         const byId = new Map(); const names = [];
         for(const [itemId, name, drv] of t.files){ names.push(name);
           const txt = await spRead(`file:///${drv||SP.drive}/${itemId}`);
-          if(!/## Sheet/.test(txt)) throw {code:"leitura_incompleta", message:"O arquivo não veio como planilha: " + txt.slice(0,80)};
+          if(!/## Sheet/.test(txt) && !/PRESEN/.test(normH(txt.slice(0,4000)))) throw {code:"leitura_incompleta", message:"O arquivo não veio como planilha: " + txt.slice(0,80)};
           const rows = parseSheet(txt, t.wd);
           rows.filter(x=>x.wd===t.wd).forEach(x=>{ const prev = byId.get(x.id); if(!prev || prev.s==="PENDENTE" || x.s==="NO SHOW") byId.set(x.id, {id:x.id, s:x.s, ...(x.d?{d:true}:{}), ...(x.fin?{fin:x.fin}:{})}); });
         }
