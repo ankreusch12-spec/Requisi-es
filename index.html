@@ -261,6 +261,7 @@ label.f input,label.f select{width:100%}
 <main class="wrap" id="main">
   <div id="banner"></div>
   <div id="spbar"></div>
+  <div id="atasbar"></div>
 
   <div id="scopeBox">
     <div class="scope">
@@ -1027,6 +1028,9 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#btnImport")){ importSeed(); return; }
   if(e.target.closest("#btnSpSync")){ spSync(false); return; }
   if(e.target.closest("#btnSpFull")){ spSync(true); return; }
+  if(e.target.closest("#btnAtas")){ ATAS.confirm = true; renderAtasBar(); return; }
+  if(e.target.closest("#btnAtasNo")){ ATAS.confirm = false; renderAtasBar(); return; }
+  if(e.target.closest("#btnAtasYes")){ atasPublish(false); return; }
 });
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape" && $("#drawerHost").innerHTML) closeDrawer();
@@ -1294,6 +1298,7 @@ async function spSync(full, onlyId){
     const meta = {at:new Date().toISOString(), by:S.me||null, lidas:targets.length, atualizadas:changed, semArquivo, listasVazias:vazias, erros:errs, pastas:ctx.folders, motivos:SP.errLog};
     await S.db.doc("sp/status").set(meta).catch(()=>{});
     const mot = Object.entries(SP.errLog).sort((a,b)=>b[1].n-a[1].n)[0];
+    if(ATAS.meta?.auto) setTimeout(()=>atasPublish(true), 500);
     SP.state = errs ? "err" : "ok"; SP.msg = `${targets.length} requisições conferidas, ${changed} atualizadas, ${vazias} com lista ainda sem candidatos, ${semArquivo} sem lista no SharePoint${errs?`, ${errs} não puderam ser lidas${mot?` (motivo mais comum: ${mot[0]})`:""}. Clique em Sincronizar de novo para tentar só as que faltaram`:""}.`;
   }catch(e){ spError(e); }
   finally{ SP.running = false; SP.prog = ""; renderSpBar(); }
@@ -1318,9 +1323,69 @@ function renderSpBar(){
     SP.running ? `<div class="progress" style="max-width:200px"><i style="width:100%;animation:pulse 1.2s ease-in-out infinite alternate"></i></div>`
     : S.canWrite ? `<button class="btn sm" type="button" id="btnSpSync" title="Relê as listas já encontradas e procura as que ainda faltam">Sincronizar agora</button><button class="btn sm ghost" type="button" id="btnSpFull" title="Procura de novo nas pastas todas as requisições, para achar listas complementares">Procurar listas novas</button>` : ""}</div>`;
 }
+
+/* ---------- arquivo das atas (Acompanhamento de Requisição.xlsx na pasta WFM/...WORKDAY) ---------- */
+const ATAS = { drive:"b!fgsU3_r4mEGqRh7XazY0cqy8R_pwql1Bufiig7dBc4fTzrASEOf8Tp5xQdUXDiQx", item:"01B34IQ3YH5XGUANVHN5FKLM2M4TJFBPK7",
+  nome:"Acompanhamento de Requisição.xlsx", meta:null, running:false, confirm:false, msg:"" };
+const STATUS_PLANILHA = { "MIGRADO/INTERNA":"MIGRADOS/ INTERNA" };
+function buildAtasWorkbook(){
+  const xd = s => s ? parse(s) : null;
+  const list = [...S.reqs.entries()].sort((a,b)=>{ const ka = a[0].startsWith("h") ? "0"+a[0] : "1"+(a[1].criadoEm||""); const kb = b[0].startsWith("h") ? "0"+b[0] : "1"+(b[1].criadoEm||""); return ka.localeCompare(kb); })
+    .map(([id,raw])=>derive(raw)).filter(r=>r.wd);
+  // CONSOLIDADO: mesmas colunas e posições da planilha original (A e B vazias, cabeçalho na linha 1)
+  const head = [null,null,"GERENTES","WORKDAY","STATUS","JUSTIFICATIVA/ACOMPANHAMENTO","CIDADE","CARTEIRA","NECESSIDADE","BUFFER","TOTAL C/BUFFER","SELECIONADOS ","NO SHOW","PRESENTE","PRODUCAGENT-DIR","DIA ABERTURA","INICIO TREINAMENTO","ALO","DIAS DE TREINAMENTO","ANO","MÊS ALO"];
+  const body = list.map(r=>[null,null, r.superintendente||"", r.wd, STATUS_PLANILHA[r.status]||r.status, r.nota||"-", r.cidade||"", r.carteira||"",
+    r.necessidade, r.buffer, r.total, r.selecionados, r.noShow, r.presente, 0, xd(r.abertura), xd(r.inicioTreino), xd(r.alo), num(r.diasTreino),
+    r.inicioTreino ? r.inicioTreino.slice(0,4) : "", r.alo ? MESES[+r.alo.slice(5,7)-1] : ""]);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([head, ...body], {cellDates:true, dateNF:"dd/mm/yyyy"});
+  ws["!cols"] = head.map((h,i)=>({wch: i<2 ? 2 : Math.max(10, Math.min(45, String(h||"").length+2))}));
+  XLSX.utils.book_append_sheet(wb, ws, "CONSOLIDADO");
+  // CONTROLE REQUISIÇÕES: um candidato por linha
+  const ctrl = [["REQUISIÇÃO","STATUS","ID WD"]];
+  list.forEach(r=>(r.candidatos||[]).forEach(c=>ctrl.push([r.wd, c.s==="NO SHOW" ? "NO SHOW" : c.s==="PRESENTE" ? "PRESENTE" : "", /^\d+$/.test(c.id) ? +c.id : null])));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ctrl), "CONTROLE REQUISIÇÕES ");
+  // DEXPARA
+  const dx = [["SUPERINTENDENTE","CONTA","OPERAÇÃO INTEGRATION","ACT ID Name","ACT ID Name NOVO ","Act ID","ENDEREÇO INTEGRATION","ANDAR","AGRUPAMENTO","CARTEIRA","TREINAMENTO ","TREINAMENTO ATUALIZADO"]];
+  [...S.cart.values()].forEach(c=>dx.push([c.superintendente, c.conta, c.cidade, c.activity, c.activity, c.actId, c.endereco, c.andar, c.agrupamento, c.nome, num(c.diasTreino), num(c.diasTreino)]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dx), "DEXPARA");
+  return {buf: XLSX.write(wb, {type:"array", bookType:"xlsx", cellDates:true, compression:true}), linhas: list.length};
+}
+function toB64(buf){ const u = new Uint8Array(buf); let s = ""; for(let i=0;i<u.length;i+=0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i+0x8000)); return btoa(s); }
+async function atasPublish(auto){
+  if(ATAS.running || !SP.mcp || !S.canWrite) return;
+  if(typeof XLSX==="undefined"){ ATAS.msg = "A biblioteca de Excel não carregou. Recarregue a página."; renderAtasBar(); return; }
+  if(!S.live || S.reqs.size < 50){ ATAS.msg = "As requisições ainda não carregaram por completo; o arquivo não foi substituído."; renderAtasBar(); return; }
+  ATAS.running = true; ATAS.msg = ""; renderAtasBar();
+  try{
+    const {buf, linhas} = buildAtasWorkbook();
+    await SP.mcp.callTool(SP.server, "sharepoint_update_file", {driveId:ATAS.drive, itemId:ATAS.item, contentBase64:toB64(buf), expectedBytes:buf.byteLength}, {cache:false});
+    const meta = {at:new Date().toISOString(), by:S.me||null, linhas, auto:true};
+    await S.db.doc("config/atas").set(meta).catch(()=>{});
+    ATAS.meta = meta; ATAS.msg = `Arquivo das atas atualizado: ${linhas} requisições gravadas em ${ATAS.nome}.`;
+    if(!auto) toast("Arquivo das atas atualizado no SharePoint.");
+  }catch(e){
+    const m = String(e?.message||"");
+    ATAS.msg = /lock|423|in use|checked out/i.test(m) ? "O arquivo das atas está aberto ou bloqueado por alguém. Feche o Excel e tente de novo."
+      : (e?.code==="not_in_manifest"||e?.code==="approval_required"||e?.code==="consent_required") ? "A página precisa da sua permissão para gravar no SharePoint. Clique em Atualizar e aceite."
+      : "Não foi possível atualizar o arquivo das atas agora. Tente de novo em instantes.";
+    spLogErr(e);
+  }finally{ ATAS.running = false; ATAS.confirm = false; renderAtasBar(); }
+}
+function renderAtasBar(){
+  const el = $("#atasbar"); if(!el) return;
+  if(!SP.mcp || !S.canWrite){ el.innerHTML = ""; return; }
+  const m = ATAS.meta, when = m?.at ? new Date(m.at) : null, ago = when ? Math.round((Date.now()-when)/6e4) : null;
+  const agoTxt = ago==null ? "ainda não foi atualizado pela página" : ago < 1 ? "atualizado agora" : ago < 60 ? `atualizado há ${ago} min` : ago < 1440 ? `atualizado há ${Math.round(ago/60)} h` : `atualizado em ${br(m.at.slice(0,10))}`;
+  el.innerHTML = `<div class="notice spn"><span class="sp-ico" aria-hidden="true">✉</span><p><b>Arquivo das atas</b> <span class="hint">${esc(ATAS.nome)} · pasta WFM/...WORKDAY · lido pelo gerador de atas</span><span class="sub">${
+    ATAS.running ? "Gravando o arquivo no SharePoint…" : esc(ATAS.msg || `${agoTxt[0].toUpperCase()+agoTxt.slice(1)}. Depois da primeira vez, ele é atualizado sozinho ao fim de cada sincronização.`)}</span></p>${
+    ATAS.running ? "" : ATAS.confirm ? `<span class="inline"><span class="hint">Substitui o arquivo atual. As versões anteriores ficam no histórico do SharePoint.</span><button class="btn primary sm" type="button" id="btnAtasYes">Substituir</button><button class="btn sm" type="button" id="btnAtasNo">Cancelar</button></span>`
+    : `<button class="btn sm" type="button" id="btnAtas">Atualizar arquivo das atas</button>`}</div>`;
+}
 async function spStart(){
   const mcp = await claude.use("mcp").catch(()=>null); if(!mcp || !S.db) return;
-  SP.mcp = mcp; SP.state = "idle"; renderSpBar();
+  SP.mcp = mcp; SP.state = "idle"; renderSpBar(); renderAtasBar();
+  S.db.doc("config/atas").onSnapshot(s=>{ ATAS.meta = s.exists ? s.data() : null; if(!ATAS.running) renderAtasBar(); }, ()=>{});
   S.db.doc("sp/index").onSnapshot(s=>{ SP.index = s.exists ? s.data() : null; }, ()=>{});
   S.db.doc("sp/status").onSnapshot(s=>{ SP.meta = s.exists ? s.data() : null; if(!SP.running) renderSpBar(); }, ()=>{});
   let st = "prompt";
